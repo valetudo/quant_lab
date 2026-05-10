@@ -1,0 +1,6 @@
+# Portfolio-level capital allocation (fractions, sum to 1.0).
+# Phase 1: bonds_income gets everything (the only working strategy).
+
+allocation:
+  bonds_income: 1.0
+  # quality_stocks: 0.0   # to be activated in Phase 2

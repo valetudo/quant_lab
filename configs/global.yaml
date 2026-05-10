@@ -1,0 +1,23 @@
+# Global configuration for quant_lab.
+# Paths use forward slashes (Windows-friendly via pathlib).
+
+data_storage_path: "G:/Il mio Drive/__NUOVA_STRUTTURA_DOCUMENTI/02_FINANZE/trading_systems/global_data_storage"
+
+# Where the GDS DuckDB store lives. Override via env GDS_DB_PATH.
+# Default: ~/.global_data_storage/store.duckdb
+duckdb_path: null
+
+# Where the bonds SQLite database lives after migration.
+bonds_db_path: "G:/Il mio Drive/__NUOVA_STRUTTURA_DOCUMENTI/02_FINANZE/trading_systems/global_data_storage/bonds/bonds.db"
+
+default_currency: "EUR"
+initial_capital_eur: 50000
+
+fees:
+  default_commission_bps: 5
+  default_slippage_bps: 5
+  default_slippage_model: "linear_bps"
+  sqrt_impact_kappa: 0.10
+
+outputs_dir: "outputs"
+logs_dir: "logs"

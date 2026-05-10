@@ -1,0 +1,12 @@
+# Parameters for the bonds_income strategy.
+# MVP — calibrate further once BTP price history is in place.
+
+n_bonds: 20
+min_yield_pct: 2.0
+max_duration_years: 8
+rebalance_freq: monthly   # monthly | weekly | quarterly
+sovereign_only: true       # restrict to government bonds
+currency: EUR
+min_years_to_maturity: 0.75
+exclude_callable: true
+exclude_inflation_linked: true

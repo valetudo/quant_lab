@@ -1,0 +1,14 @@
+# Per-provider configuration.
+
+yfinance:
+  enabled: true
+  rate_limit_per_min: 30
+
+borsa_italiana:
+  enabled: true
+  scraper_headless: true
+  profiles: ["sovereigns_eur", "corporates_eur", "sovereigns_usd"]
+
+fmp:
+  enabled: false  # stub only; populate api_key to enable in fase 2
+  api_key: null

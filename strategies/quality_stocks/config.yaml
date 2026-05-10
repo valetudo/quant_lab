@@ -1,0 +1,9 @@
+# quality_stocks parameters — PLACEHOLDER. Calibrated in Phase 2.
+
+universe: SP500_PROXY
+n_holdings: 30
+quality_score:
+  roic_weight: 0.4
+  debt_equity_weight: 0.3
+  gross_margin_stability_weight: 0.3
+rebalance_freq: quarterly

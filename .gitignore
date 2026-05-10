@@ -1,0 +1,39 @@
+# Backups and migration artefacts
+_backups/
+_migration_log/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data and binaries
+data_storage/
+*.duckdb
+*.parquet
+*.db
+*.sqlite
+*.sqlite3
+
+# Outputs and logs
+outputs/
+logs/
+
+# Secrets and local config
+.env
+secrets.yaml
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
