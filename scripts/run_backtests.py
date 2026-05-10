@@ -54,14 +54,15 @@ def _make_strategy(strategy_id: str, *, storage: DataStorage, capital: float):
 def _build_panel(strategy_id: str, start: date, end: date,
                  storage: DataStorage) -> pd.DataFrame:
     if strategy_id == "bonds_income":
-        # Synthetic flat panel keyed by current ISINs
+        # Synthetic flat panel keyed by ALL current ISINs so the strategy's
+        # selected bonds always have a price column.
         provider = None
         if storage.bonds_db_exists():
             from quant_lab.core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
             provider = BorsaItalianaProvider(db_path=storage.bonds_db_path)
         isins = []
         if provider is not None:
-            isins = [b["isin"] for b in provider.list_bonds()][:30]
+            isins = [b["isin"] for b in provider.list_bonds()]
         if not isins:
             isins = [f"MOCK_{i:03d}" for i in range(5)]
         idx = pd.bdate_range(start, end)

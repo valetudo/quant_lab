@@ -37,3 +37,7 @@ secrets.yaml
 *.swp
 .DS_Store
 Thumbs.db
+
+# Coverage
+.coverage
+htmlcov/
