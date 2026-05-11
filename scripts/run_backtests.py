@@ -48,11 +48,28 @@ def _make_strategy(strategy_id: str, *, storage: DataStorage, capital: float):
         provider = BorsaItalianaProvider(db_path=storage.bonds_db_path) \
             if storage.bonds_db_exists() else None
         return BondsIncome(bonds_provider=provider, initial_capital_eur=capital)
+    if strategy_id == "quality_stocks":
+        from quant_lab.core.data.providers.fmp_provider import FMPProvider
+        from quant_lab.strategies.quality_stocks import QualityStocks
+        return QualityStocks(fmp=FMPProvider())
     raise SystemExit(f"unknown strategy: {strategy_id}")
 
 
 def _build_panel(strategy_id: str, start: date, end: date,
                  storage: DataStorage) -> pd.DataFrame:
+    if strategy_id == "quality_stocks":
+        # Load real prices from the FMP parquet tree.
+        from quant_lab.core.data.providers.fmp_provider import FMPProvider
+        from quant_lab.strategies.quality_stocks.runner import build_panel
+        fmp = FMPProvider()
+        universe = fmp.get_index_constituents("sp500")
+        panel = build_panel(storage, start=start, end=end,
+                            universe_symbols=universe, extra=("SPY", "IEF"))
+        if panel.empty:
+            raise SystemExit("empty panel for quality_stocks — run "
+                             "scripts/migrate_prices_to_fmp.py first.")
+        return panel
+
     if strategy_id == "bonds_income":
         # Synthetic flat panel keyed by ALL current ISINs so the strategy's
         # selected bonds always have a price column.
@@ -84,7 +101,7 @@ def _build_panel(strategy_id: str, start: date, end: date,
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run a quant_lab backtest")
     ap.add_argument("--strategy", required=True,
-                    choices=["dummy_buy_and_hold", "bonds_income"])
+                    choices=["dummy_buy_and_hold", "bonds_income", "quality_stocks"])
     ap.add_argument("--start", required=True, type=_parse_date)
     ap.add_argument("--end", required=True, type=_parse_date)
     ap.add_argument("--capital", type=float, default=None)

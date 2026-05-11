@@ -136,3 +136,101 @@ class DataStorage:
 
     def bonds_db_exists(self) -> bool:
         return self.bonds_db_path.exists()
+
+    # ---- FMP parquet tree (Phase 2) -------------------------------------
+
+    @property
+    def prices_root(self) -> Path:
+        return self.data_storage_path / "prices"
+
+    def list_universes(self) -> list[str]:
+        """List universes available on disk (post-FMP migration)."""
+        root = self.prices_root
+        if not root.exists():
+            return []
+        out = []
+        for country in sorted(root.iterdir()):
+            if country.is_dir():
+                # ETF/indices are flat; sp500/ftse100 live under country/
+                if country.name in {"etf", "indices"}:
+                    if any(country.glob("*.parquet")):
+                        out.append(country.name)
+                else:
+                    for univ in sorted(country.iterdir()):
+                        if univ.is_dir() and any(univ.glob("*.parquet")):
+                            out.append(f"{country.name}/{univ.name}")
+        return out
+
+    def _universe_dir(self, universe: str) -> Path:
+        return self.prices_root / universe
+
+    def get_universe_symbols(self, universe: str) -> list[str]:
+        d = self._universe_dir(universe)
+        if not d.exists():
+            return []
+        # Filename -> symbol (reverse the safe-symbol mapping)
+        out = []
+        for p in sorted(d.glob("*.parquet")):
+            stem = p.stem
+            sym = stem.replace("_idx_", "^")
+            # Common LSE suffix encoding "BARC_L" -> "BARC.L"
+            if "_" in sym and sym.endswith("_L"):
+                sym = sym[:-2] + ".L"
+            out.append(sym)
+        return out
+
+    def _safe_symbol(self, symbol: str) -> str:
+        return symbol.replace("^", "_idx_").replace("/", "_").replace(".", "_")
+
+    def get_prices(
+        self,
+        symbol: str,
+        start: date | str | None = None,
+        end: date | str | None = None,
+        *,
+        universe: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Read OHLCV from the parquet tree.
+
+        If `universe` is given, looks directly at that universe's dir.
+        Otherwise, searches all universes for a matching parquet file.
+        """
+        candidates = (
+            [self._universe_dir(universe)] if universe else
+            [self._universe_dir(u) for u in self.list_universes()]
+        )
+        safe = self._safe_symbol(symbol)
+        for d in candidates:
+            p = d / f"{safe}.parquet"
+            if p.exists():
+                df = pd.read_parquet(p)
+                df["date"] = pd.to_datetime(df["date"])
+                df = df.sort_values("date").set_index("date")
+                if start:
+                    df = df[df.index >= pd.to_datetime(start)]
+                if end:
+                    df = df[df.index <= pd.to_datetime(end)]
+                return df
+        return pd.DataFrame()
+
+    def get_prices_panel(
+        self,
+        symbols: Sequence[str],
+        start: date | str | None = None,
+        end: date | str | None = None,
+        *,
+        universe: Optional[str] = None,
+        field: str = "adj_close",
+    ) -> pd.DataFrame:
+        """Wide DataFrame [date × symbol] of `field`. Skips missing symbols silently."""
+        frames = {}
+        for s in symbols:
+            df = self.get_prices(s, start, end, universe=universe)
+            if df.empty or field not in df.columns:
+                continue
+            frames[s] = df[field]
+        if not frames:
+            return pd.DataFrame()
+        out = pd.concat(frames, axis=1)
+        out.columns.name = "symbol"
+        return out

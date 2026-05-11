@@ -1,9 +1,42 @@
-# quality_stocks parameters — PLACEHOLDER. Calibrated in Phase 2.
+# Quality Stocks parameters.
 
-universe: SP500_PROXY
-n_holdings: 30
-quality_score:
-  roic_weight: 0.4
-  debt_equity_weight: 0.3
-  gross_margin_stability_weight: 0.3
-rebalance_freq: quarterly
+strategy_id: quality_stocks
+universe: sp500_ex_financials
+
+# Selection
+target_securities: 20      # final portfolio size
+quality_pool: 50           # top N by quality before momentum filter
+momentum_lookback: 126     # ~6 months
+momentum_skip: 10          # skip the last 10 trading days
+
+# Trend filter
+trend_short_ma: 50
+trend_long_ma: 200
+trend_reference: SPY
+
+# Bond fallback (when SPY downtrend: hold existing equity + IEF for the rest)
+bond_fallback: IEF
+
+# Quality score weights (composite rank, fractional)
+quality_weights:
+  roic: 1.0
+  fcf_yield: 1.0
+  cash_return: 1.0
+  inv_debt_eq: 1.0
+  stable_roic: 1.0
+
+# Sizing
+capital_per_position_eur: 5000   # 20 positions × 5k = 100k notional
+initial_capital_eur: 100000
+
+# Rebalancing
+rebalance_frequency: monthly     # monthly | weekly | quarterly
+
+# Sectors to exclude (FMP sector strings). 'Financial Services' covers banks & insurance.
+exclude_sectors:
+  - "Financial Services"
+
+# Costs (passed to engine if backtester reads config)
+commission_bps: 5
+slippage_bps: 5
+slippage_model: linear_bps

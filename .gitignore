@@ -2,8 +2,13 @@
 _backups/
 _migration_log/
 
+# Secrets / FMP cache
+.env
+data_storage/cache/
+
 # Python
 __pycache__/
+.env
 *.pyc
 *.pyo
 *.pyd

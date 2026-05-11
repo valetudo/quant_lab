@@ -1,6 +1,11 @@
 # Portfolio-level capital allocation (fractions, sum to 1.0).
-# Phase 1: bonds_income gets everything (the only working strategy).
+# Phase 2: bonds_income + quality_stocks at equal weight via EqualWeightAllocator.
+# (configs/allocation.yaml is informational — the actual allocator in code
+#  may compute weights dynamically; this file is the default static fallback
+#  consumed by the Portfolio Overview UI page.)
 
 allocation:
-  bonds_income: 1.0
-  # quality_stocks: 0.0   # to be activated in Phase 2
+  bonds_income: 0.5
+  quality_stocks: 0.5
+
+cash_reserve: 0.0

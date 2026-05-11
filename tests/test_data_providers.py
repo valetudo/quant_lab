@@ -1,9 +1,12 @@
 """Provider scaffolding tests — instantiation + ID stability."""
 from __future__ import annotations
 
+import os
+import pytest
+
 from quant_lab.core.data.providers.base import BaseProvider
 from quant_lab.core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
-from quant_lab.core.data.providers.stub_fmp_provider import FMPProvider
+from quant_lab.core.data.providers.fmp_provider import FMPProvider
 from quant_lab.core.data.providers.yfinance_provider import YFinanceProvider
 
 
@@ -12,15 +15,20 @@ def test_all_providers_subclass_base():
         assert issubclass(cls, BaseProvider)
 
 
-def test_provider_ids():
-    assert FMPProvider().provider_id == "fmp"
+def test_yfinance_provider_id():
     assert YFinanceProvider().provider_id == "yfinance"
+
+
+def test_borsa_italiana_provider_id():
     assert BorsaItalianaProvider().provider_id == "borsa_italiana"
 
 
-def test_fmp_stub_safe_calls():
+@pytest.mark.skipif(
+    not os.getenv("FMP_API_KEY"),
+    reason="FMP_API_KEY not set",
+)
+def test_fmp_provider_instantiates():
     p = FMPProvider()
+    assert p.provider_id == "fmp"
     r = p.refresh()
-    assert r["status"] == "not_implemented"
-    f = p.fetch_fundamentals("AAPL")
-    assert f["status"] == "not_implemented"
+    assert r["status"] == "ok"

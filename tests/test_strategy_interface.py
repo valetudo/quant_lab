@@ -13,11 +13,25 @@ REQUIRED_METHODS = {"on_init", "generate_signals", "manage_positions"}
 REQUIRED_PROPERTIES = {"strategy_id", "universe"}
 
 
+class _NullFMP:
+    """Minimal stand-in for FMPProvider used only to satisfy QualityStocks ctor."""
+    def get_index_constituents(self, index):
+        return []
+    def get_key_metrics(self, *a, **kw):
+        import pandas as pd
+        return pd.DataFrame()
+    def get_ratios(self, *a, **kw):
+        import pandas as pd
+        return pd.DataFrame()
+
+
 def _instance_for(cls):
     if cls is DummyBuyAndHold:
         return cls(tickers=["AAA"])
     if cls is BondsIncome:
         return cls(bond_snapshot=[])
+    if cls is QualityStocks:
+        return cls(fmp=_NullFMP(), universe_symbols=[], prefetch=False)
     return cls()
 
 
