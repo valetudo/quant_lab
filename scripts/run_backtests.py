@@ -6,6 +6,7 @@ Usage:
     python scripts/run_backtests.py --strategy bonds_income \\
         --start 2024-01-01 --end 2025-12-31
 """
+
 from __future__ import annotations
 
 import argparse
@@ -14,21 +15,19 @@ import sys
 from datetime import date
 from pathlib import Path
 
-# --- bootstrap: make `import quant_lab` resolve without pip install ---
+# --- bootstrap: add repo root to sys.path (no pip install needed) ---
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_PARENT = _REPO_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 # ---
 
 import numpy as np
 import pandas as pd
 
-from quant_lab.core.analytics.metrics import compute_metrics
-from quant_lab.core.backtest.engine import PortfolioBacktester
-from quant_lab.core.data.storage import DataStorage, load_global_config
-from quant_lab.core.io.standard_schema import write_standard_outputs
-
+from core.analytics.metrics import compute_metrics
+from core.backtest.engine import PortfolioBacktester
+from core.data.storage import DataStorage, load_global_config
+from core.io.standard_schema import write_standard_outputs
 
 log = logging.getLogger("run_backtests")
 
@@ -39,35 +38,34 @@ def _parse_date(s: str) -> date:
 
 def _make_strategy(strategy_id: str, *, storage: DataStorage, capital: float):
     if strategy_id == "dummy_buy_and_hold":
-        from quant_lab.strategies._examples import DummyBuyAndHold
-        return DummyBuyAndHold(tickers=["AAPL", "MSFT", "SPY"],
-                               initial_capital_eur=capital)
+        from strategies._examples import DummyBuyAndHold
+
+        return DummyBuyAndHold(tickers=["AAPL", "MSFT", "SPY"], initial_capital_eur=capital)
     if strategy_id == "bonds_income":
-        from quant_lab.core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
-        from quant_lab.strategies.bonds_income import BondsIncome
-        provider = BorsaItalianaProvider(db_path=storage.bonds_db_path) \
-            if storage.bonds_db_exists() else None
+        from core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
+        from strategies.bonds_income import BondsIncome
+
+        provider = (
+            BorsaItalianaProvider(db_path=storage.bonds_db_path)
+            if storage.bonds_db_exists()
+            else None
+        )
         return BondsIncome(bonds_provider=provider, initial_capital_eur=capital)
-    if strategy_id == "quality_stocks":
-        from quant_lab.core.data.providers.fmp_provider import FMPProvider
-        from quant_lab.strategies.quality_stocks import QualityStocks
-        return QualityStocks(fmp=FMPProvider())
+    if strategy_id == "passive_equity":
+        from strategies.passive_equity import PassiveEquity
+
+        return PassiveEquity(symbol="CSPX.L", initial_capital_eur=capital)
     raise SystemExit(f"unknown strategy: {strategy_id}")
 
 
-def _build_panel(strategy_id: str, start: date, end: date,
-                 storage: DataStorage) -> pd.DataFrame:
-    if strategy_id == "quality_stocks":
-        # Load real prices from the FMP parquet tree.
-        from quant_lab.core.data.providers.fmp_provider import FMPProvider
-        from quant_lab.strategies.quality_stocks.runner import build_panel
-        fmp = FMPProvider()
-        universe = fmp.get_index_constituents("sp500")
-        panel = build_panel(storage, start=start, end=end,
-                            universe_symbols=universe, extra=("SPY", "IEF"))
+def _build_panel(strategy_id: str, start: date, end: date, storage: DataStorage) -> pd.DataFrame:
+    if strategy_id == "passive_equity":
+        # Phase 4 equity sleeve: try CSPX.L first (via parquet tree), then
+        # fall back to SPY proxy. ETFs live in the etf/ parquet universe,
+        # not the DuckDB store, so we use get_prices_panel (parquet reader).
+        panel = storage.get_prices_panel(["CSPX.L", "SPY"], start, end)
         if panel.empty:
-            raise SystemExit("empty panel for quality_stocks — run "
-                             "scripts/migrate_prices_to_fmp.py first.")
+            log.warning("No CSPX.L or SPY data — returning empty panel.")
         return panel
 
     if strategy_id == "bonds_income":
@@ -75,7 +73,8 @@ def _build_panel(strategy_id: str, start: date, end: date,
         # selected bonds always have a price column.
         provider = None
         if storage.bonds_db_exists():
-            from quant_lab.core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
+            from core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
+
             provider = BorsaItalianaProvider(db_path=storage.bonds_db_path)
         isins = []
         if provider is not None:
@@ -100,8 +99,11 @@ def _build_panel(strategy_id: str, start: date, end: date,
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run a quant_lab backtest")
-    ap.add_argument("--strategy", required=True,
-                    choices=["dummy_buy_and_hold", "bonds_income", "quality_stocks"])
+    ap.add_argument(
+        "--strategy",
+        required=True,
+        choices=["dummy_buy_and_hold", "bonds_income", "passive_equity"],
+    )
     ap.add_argument("--start", required=True, type=_parse_date)
     ap.add_argument("--end", required=True, type=_parse_date)
     ap.add_argument("--capital", type=float, default=None)
@@ -118,7 +120,9 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = load_global_config()
     storage = DataStorage.from_config(cfg)
-    capital = args.capital if args.capital is not None else float(cfg.get("initial_capital_eur", 50_000))
+    capital = (
+        args.capital if args.capital is not None else float(cfg.get("initial_capital_eur", 50_000))
+    )
 
     panel = _build_panel(args.strategy, args.start, args.end, storage)
     if panel.empty:
@@ -127,30 +131,44 @@ def main(argv: list[str] | None = None) -> int:
 
     strat = _make_strategy(args.strategy, storage=storage, capital=capital)
     bt = PortfolioBacktester(
-        strat, panel, initial_capital_eur=capital,
-        commission_bps=args.commission_bps, slippage_bps=args.slippage_bps,
+        strat,
+        panel,
+        initial_capital_eur=capital,
+        commission_bps=args.commission_bps,
+        slippage_bps=args.slippage_bps,
     )
     log.info("running %s on %d bars × %d cols", args.strategy, *panel.shape)
     res = bt.run()
 
     eq = res.equity["equity"] if not res.equity.empty else pd.Series(dtype=float)
-    metrics = compute_metrics(eq, res.trades, capital,
-                              open_count=res.open_count, exposure=res.exposure)
+    metrics = compute_metrics(
+        eq, res.trades, capital, open_count=res.open_count, exposure=res.exposure
+    )
 
     repo_root = Path(__file__).resolve().parents[1]
-    out_dir = Path(args.out_dir) if args.out_dir else (
-        repo_root / "outputs" / args.strategy / f"{args.start}_{args.end}"
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else (repo_root / "outputs" / args.strategy / f"{args.start}_{args.end}")
     )
     paths = write_standard_outputs(
         out_dir,
-        strategy_id=args.strategy, universe=",".join(panel.columns[:5]) + "...",
-        currency="EUR", trades=res.trades, equity=res.equity,
-        open_count=res.open_count, metrics=metrics,
-        period_start=args.start, period_end=args.end,
+        strategy_id=args.strategy,
+        universe=",".join(panel.columns[:5]) + "...",
+        currency="EUR",
+        trades=res.trades,
+        equity=res.equity,
+        open_count=res.open_count,
+        metrics=metrics,
+        period_start=args.start,
+        period_end=args.end,
     )
-    log.info("trades=%d, sharpe=%.2f, final_eq=%.0f",
-             metrics.get("n_trades", 0), metrics.get("sharpe", 0) or 0,
-             metrics.get("final_equity", 0) or 0)
+    log.info(
+        "trades=%d, sharpe=%.2f, final_eq=%.0f",
+        metrics.get("n_trades", 0),
+        metrics.get("sharpe", 0) or 0,
+        metrics.get("final_equity", 0) or 0,
+    )
     for k, p in paths.items():
         print(f"{k}: {p}")
     return 0

@@ -1,13 +1,15 @@
 """Provider scaffolding tests — instantiation + ID stability."""
+
 from __future__ import annotations
 
 import os
+
 import pytest
 
-from quant_lab.core.data.providers.base import BaseProvider
-from quant_lab.core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
-from quant_lab.core.data.providers.fmp_provider import FMPProvider
-from quant_lab.core.data.providers.yfinance_provider import YFinanceProvider
+from core.data.providers.base import BaseProvider
+from core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
+from core.data.providers.fmp_provider import FMPProvider
+from core.data.providers.yfinance_provider import YFinanceProvider
 
 
 def test_all_providers_subclass_base():

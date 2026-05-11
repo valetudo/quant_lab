@@ -1,0 +1,58 @@
+# Phase 4 — static strategic allocation 50/30/20.
+# Bonds enlarged from 60→50% (capital frees up for opportunistic).
+# Opportunistic enlarged from 10→20% (room for Pattern Finder + ad-hoc strategies).
+# Equity unchanged at 30% but flipped from active (Quality Stocks V5) to
+# passive (CSPX S&P 500 UCITS ETF) after V5 was archived.
+
+strategic_allocation:
+  bonds: 0.50
+  equity: 0.30
+  opportunistic: 0.20
+
+drift_threshold_pp: 5.0
+
+sleeves:
+  bonds:
+    strategy_ids: ["bonds_income"]
+    strategy_weights:
+      bonds_income: 1.0
+    notes: |
+      Bond ladder, mix sovereign 70% / corporate IG 30%.
+      Manual rebalancing; ladder tracker on the Bond Ladder page
+      provides decision support (gap analysis, cash flow projection,
+      health check).
+
+  equity:
+    strategy_ids: ["passive_equity"]
+    strategy_weights:
+      passive_equity: 1.0
+    notes: |
+      Passive S&P 500 exposure via CSPX (iShares Core S&P 500 UCITS ETF).
+      Quality Stocks V5 archived 2026-05-11 after underperforming SPY by
+      -4.6 %/yr in 13-y OOS comparison. Bonds ladder provides the defensive
+      overlay; equity sleeve focuses on growth.
+
+  opportunistic:
+    strategy_ids: []           # populated dynamically by registry auto-discovery
+    strategy_weights: {}       # equal split among active opportunistic strategies
+    notes: |
+      20 % reserved for short-term opportunistic strategies. Plug-and-play:
+      drop a module in strategies/<id>/ with a config.yaml and the registry
+      picks it up automatically. Inactive strategies → capital sits as cash
+      within the sleeve.
+
+total_capital_eur: 100000
+
+strategy_configs:
+  bonds_income:
+    config_path: "strategies/bonds_income/config.yaml"
+  passive_equity:
+    config_path: "strategies/passive_equity/config.yaml"
+
+archived_strategies:
+  - id: "quality_stocks"
+    archived_date: "2026-05-11"
+    reason: "Underperformed SPY by 4.6 %/yr in 13-yr OOS comparison"
+    historical_results_path: "outputs/quality_stocks/"
+    decision_report: "_migration_log/V5_VS_SPY_DECISION.md"
+    code_archive_path: "strategies/_archived/quality_stocks/"

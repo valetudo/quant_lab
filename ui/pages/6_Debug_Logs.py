@@ -1,4 +1,5 @@
 """Debug Logs — browse migration and runtime logs."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,11 +31,13 @@ choice = st.selectbox(
     format_func=lambda p: f"{p.parent.name}/{p.name}",
 )
 
-level_filter = st.multiselect("Filter by level", ["ERROR", "WARNING", "INFO", "DEBUG"],
-                              default=["ERROR", "WARNING", "INFO"])
+level_filter = st.multiselect(
+    "Filter by level", ["ERROR", "WARNING", "INFO", "DEBUG"], default=["ERROR", "WARNING", "INFO"]
+)
 
 text = choice.read_text(encoding="utf-8", errors="replace")
 lines = text.splitlines()
+
 
 def _matches(line: str) -> bool:
     if not level_filter:
@@ -50,7 +53,7 @@ def _color(line: str) -> str:
     return line
 
 
-filtered = [_color(l) for l in lines if _matches(l)]
+filtered = [_color(line) for line in lines if _matches(line)]
 st.markdown(
     "<div style='font-family:monospace;white-space:pre-wrap;font-size:12px;'>"
     + "<br/>".join(filtered)

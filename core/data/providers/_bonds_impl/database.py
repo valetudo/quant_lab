@@ -8,14 +8,14 @@ bonds          : one row per ISIN, with latest catalog metadata
 bond_prices    : (isin, date) -> price; multiple historical points per bond
 scrape_runs    : audit log of each sync attempt
 """
+
 from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Iterable, Iterator, List, Optional
-
+from typing import Iterator, List, Optional
 
 STALE_THRESHOLD_DAYS = 14  # bonds not seen in this many days become inactive
 
@@ -144,8 +144,20 @@ class Database:
                   is_active=1,
                   last_seen=excluded.last_seen
                 """,
-                (isin, name, coupon, maturity_date, currency, category,
-                 tipologia, nation, issuer_type, geo_area, seen_at, seen_at),
+                (
+                    isin,
+                    name,
+                    coupon,
+                    maturity_date,
+                    currency,
+                    category,
+                    tipologia,
+                    nation,
+                    issuer_type,
+                    geo_area,
+                    seen_at,
+                    seen_at,
+                ),
             )
 
     def upsert_price(self, isin: str, date: str, price: float) -> None:
@@ -159,9 +171,7 @@ class Database:
                 (isin, date, price),
             )
 
-    def list_bonds_with_latest_price(
-        self, include_inactive: bool = False
-    ) -> List[dict]:
+    def list_bonds_with_latest_price(self, include_inactive: bool = False) -> List[dict]:
         """Return every bond with its most recent price (NULL if none).
 
         By default excludes rows soft-purged by mark_stale_inactive() —
@@ -200,8 +210,7 @@ class Database:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
         with self.connect() as conn:
             cur = conn.execute(
-                "UPDATE bonds SET is_active = 0 "
-                "WHERE last_seen < ? AND is_active = 1",
+                "UPDATE bonds SET is_active = 0 WHERE last_seen < ? AND is_active = 1",
                 (cutoff,),
             )
             return cur.rowcount or 0
@@ -213,9 +222,7 @@ class Database:
 
     def count_with_price(self) -> int:
         with self.connect() as conn:
-            row = conn.execute(
-                "SELECT COUNT(DISTINCT isin) AS n FROM bond_prices"
-            ).fetchone()
+            row = conn.execute("SELECT COUNT(DISTINCT isin) AS n FROM bond_prices").fetchone()
             return int(row["n"]) if row else 0
 
     def delete_bond(self, isin: str) -> None:
@@ -230,9 +237,7 @@ class Database:
         being shadowed by a previous run.
         """
         with self.connect() as conn:
-            conn.execute(
-                "UPDATE bonds SET category = NULL, tipologia = NULL, nation = NULL"
-            )
+            conn.execute("UPDATE bonds SET category = NULL, tipologia = NULL, nation = NULL")
 
     # ------------------------------------------------------------------ #
     # Scrape audit log
@@ -273,9 +278,7 @@ class Database:
 
     def last_scrape_run(self) -> Optional[dict]:
         with self.connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM scrape_runs ORDER BY id DESC LIMIT 1"
-            ).fetchone()
+            row = conn.execute("SELECT * FROM scrape_runs ORDER BY id DESC LIMIT 1").fetchone()
             return dict(row) if row else None
 
     def list_scrape_runs(self, limit: int = 20) -> List[dict]:

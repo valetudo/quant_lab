@@ -15,6 +15,7 @@ Behaviour:
   - Generates an audit report at the end with success/fail counts.
   - Tracks API call count (FMP usage stays well under the 750/min Premium ceiling).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,17 +29,15 @@ from pathlib import Path
 
 # --- bootstrap ---
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_PARENT = _REPO_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 # ---
 
 import pandas as pd
 from tqdm import tqdm
 
-from quant_lab.core.data.providers.fmp_provider import FMPProvider
-from quant_lab.core.data.storage import load_global_config
-
+from core.data.providers.fmp_provider import FMPProvider
+from core.data.storage import load_global_config
 
 log = logging.getLogger("migrate_prices")
 
@@ -53,10 +52,10 @@ INDICES_LIST = ["^GSPC", "^VIX"]  # ^TNX requires higher tier; treasury-rates co
 def universe_paths(prices_root: Path) -> dict[str, Path]:
     """Return the expected directories per universe."""
     return {
-        "us/sp500":   prices_root / "us" / "sp500",
+        "us/sp500": prices_root / "us" / "sp500",
         "uk/ftse100": prices_root / "uk" / "ftse100",
-        "etf":        prices_root / "etf",
-        "indices":    prices_root / "indices",
+        "etf": prices_root / "etf",
+        "indices": prices_root / "indices",
     }
 
 
@@ -129,8 +128,12 @@ def migrate_universe(
         except Exception as e:
             log.warning("failed %s: %s", sym, e)
             results[sym] = "error"
-        pbar.set_postfix({k: sum(1 for v in results.values() if v == k)
-                          for k in ("ok", "skipped", "empty", "error")})
+        pbar.set_postfix(
+            {
+                k: sum(1 for v in results.values() if v == k)
+                for k in ("ok", "skipped", "empty", "error")
+            }
+        )
     return results
 
 
@@ -139,12 +142,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--start", default="2016-01-01", type=date.fromisoformat)
     ap.add_argument("--end", default=date.today().isoformat(), type=date.fromisoformat)
     ap.add_argument("--force", action="store_true", help="ignore freshness, refetch all")
-    ap.add_argument("--universes", nargs="+", default=None,
-                    help="subset: any of us/sp500, uk/ftse100, etf, indices")
-    ap.add_argument("--out-root", default=None,
-                    help="override prices root (default: <data_storage_path>/prices)")
-    ap.add_argument("--limit", type=int, default=None,
-                    help="cap each universe to N symbols (smoke test)")
+    ap.add_argument(
+        "--universes",
+        nargs="+",
+        default=None,
+        help="subset: any of us/sp500, uk/ftse100, etf, indices",
+    )
+    ap.add_argument(
+        "--out-root",
+        default=None,
+        help="override prices root (default: <data_storage_path>/prices)",
+    )
+    ap.add_argument(
+        "--limit", type=int, default=None, help="cap each universe to N symbols (smoke test)"
+    )
     args = ap.parse_args(argv)
 
     logging.basicConfig(
@@ -153,8 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     cfg = load_global_config()
-    data_root = Path(cfg.get("data_storage_path") or
-                     (_REPO_ROOT / "data_storage"))
+    data_root = Path(cfg.get("data_storage_path") or (_REPO_ROOT / "data_storage"))
     prices_root = Path(args.out_root) if args.out_root else (data_root / "prices")
     log.info("prices root: %s", prices_root)
     log.info("window: %s -> %s", args.start, args.end)
@@ -165,7 +175,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # Build list of universes to migrate
     paths = universe_paths(prices_root)
-    selected = list(paths.keys()) if not args.universes else [u for u in args.universes if u in paths]
+    selected = (
+        list(paths.keys()) if not args.universes else [u for u in args.universes if u in paths]
+    )
     log.info("universes: %s", selected)
 
     sp500_symbols: list[str] = []
@@ -178,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
         log.info("fetching S&P 500 constituents...")
         sp500_symbols = fmp.get_index_constituents("sp500")
         if args.limit:
-            sp500_symbols = sp500_symbols[:args.limit]
+            sp500_symbols = sp500_symbols[: args.limit]
         log.info("S&P 500: %d symbols", len(sp500_symbols))
         overall["us/sp500"] = migrate_universe(
             fmp, sp500_symbols, paths["us/sp500"], args.start, args.end, force=args.force
@@ -187,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     if "uk/ftse100" in selected:
         ftse100_symbols = fmp.get_ftse100_constituents()
         if args.limit:
-            ftse100_symbols = ftse100_symbols[:args.limit]
+            ftse100_symbols = ftse100_symbols[: args.limit]
         log.info("FTSE 100: %d symbols", len(ftse100_symbols))
         overall["uk/ftse100"] = migrate_universe(
             fmp, ftse100_symbols, paths["uk/ftse100"], args.start, args.end, force=args.force
@@ -220,8 +232,9 @@ def main(argv: list[str] | None = None) -> int:
         },
     }
     for uname, res in overall.items():
-        counts = {k: sum(1 for v in res.values() if v == k)
-                  for k in ("ok", "skipped", "empty", "error")}
+        counts = {
+            k: sum(1 for v in res.values() if v == k) for k in ("ok", "skipped", "empty", "error")
+        }
         counts["total"] = len(res)
         summary["universes"][uname] = counts
     print(json.dumps(summary, indent=2, default=str))

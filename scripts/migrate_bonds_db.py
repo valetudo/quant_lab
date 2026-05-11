@@ -3,6 +3,7 @@
 Run once after quant_lab is checked out. Idempotent: if the destination
 already exists with the same size, it skips.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -12,24 +13,32 @@ from pathlib import Path
 
 # --- bootstrap ---
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_PARENT = _REPO_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 # ---
 
-from quant_lab.core.data.storage import load_global_config, _project_root
+import os
 
+from core.data.storage import _project_root, load_global_config
 
-DEFAULT_SOURCE = Path(
-    "G:/Il mio Drive/__NUOVA_STRUTTURA_DOCUMENTI/02_FINANZE/"
-    "trading_systems/bonds/bonds.db"
+# Default source: a sibling `bonds/` repo next to this monorepo. Override
+# via env var QUANT_LAB_BONDS_SOURCE or the --source CLI flag.
+_DEFAULT_SOURCE_ENV = os.environ.get("QUANT_LAB_BONDS_SOURCE")
+DEFAULT_SOURCE = (
+    Path(_DEFAULT_SOURCE_ENV) if _DEFAULT_SOURCE_ENV else (_REPO_ROOT.parent / "bonds" / "bonds.db")
 )
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Migrate bonds.db into the quant_lab data storage path.")
+    ap = argparse.ArgumentParser(
+        description="Migrate bonds.db into the quant_lab data storage path."
+    )
     ap.add_argument("--source", default=str(DEFAULT_SOURCE), help="Original bonds.db path")
-    ap.add_argument("--dest", default=None, help="Destination override (default: configs/global.yaml bonds_db_path)")
+    ap.add_argument(
+        "--dest",
+        default=None,
+        help="Destination override (default: configs/global.yaml bonds_db_path)",
+    )
     args = ap.parse_args(argv)
 
     src = Path(args.source)
@@ -38,9 +47,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     cfg = load_global_config()
-    dest = Path(args.dest) if args.dest else Path(
-        cfg.get("bonds_db_path")
-        or (_project_root() / "data_storage" / "bonds" / "bonds.db")
+    dest = (
+        Path(args.dest)
+        if args.dest
+        else Path(
+            cfg.get("bonds_db_path") or (_project_root() / "data_storage" / "bonds" / "bonds.db")
+        )
     )
     dest.parent.mkdir(parents=True, exist_ok=True)
 

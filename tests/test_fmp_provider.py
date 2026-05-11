@@ -1,14 +1,14 @@
 """FMPProvider integration tests — skipped if FMP_API_KEY not set."""
+
 from __future__ import annotations
 
 import os
 import time
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
 
-from quant_lab.core.data.providers.fmp_provider import FMPProvider, TokenBucket
+from core.data.providers.fmp_provider import FMPProvider, TokenBucket
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("FMP_API_KEY"),
@@ -88,9 +88,7 @@ def test_ftse100_constituents(fmp):
 
 
 def test_treasury_rates(fmp):
-    tr = fmp.get_treasury_rates(
-        date.today() - timedelta(days=30), date.today()
-    )
+    tr = fmp.get_treasury_rates(date.today() - timedelta(days=30), date.today())
     assert not tr.empty
     assert any(col.startswith("year") for col in tr.columns)
 

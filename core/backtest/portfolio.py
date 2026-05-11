@@ -2,6 +2,7 @@
 
 Used by the generalized engine. Strategy-agnostic.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -10,12 +11,13 @@ from uuid import uuid4
 
 import pandas as pd
 
-from quant_lab.core.strategy.signals import Position
+from core.strategy.signals import Position
 
 
 @dataclass
 class Trade:
     """Closed trade record — duck-typed for standard_schema and metrics."""
+
     trade_id: str
     strategy_id: str
     instruments: list[str]

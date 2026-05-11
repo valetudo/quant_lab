@@ -1,9 +1,11 @@
 """PaperBroker — in-memory order/position tracking. Scaffold only (no fills, no fees)."""
+
 from __future__ import annotations
+
 from uuid import uuid4
 
-from quant_lab.core.execution.broker_base import BrokerBase
-from quant_lab.core.strategy.signals import Signal
+from core.execution.broker_base import BrokerBase
+from core.strategy.signals import Signal
 
 
 class PaperBroker(BrokerBase):

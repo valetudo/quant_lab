@@ -1,0 +1,34 @@
+strategy_id: pattern_finder
+description: "External pattern detection adapter (LSTM autoencoder + HMM + LightGBM)"
+
+# Set to 'active' AFTER cloning the external repo AND implementing
+# the signal translation TODOs in strategy.py.
+status: scaffold
+
+# Path to the external pattern_finder repo. Override on your machine via env var
+# PATTERN_FINDER_PATH, or edit this line directly. The default points to a
+# sibling directory next to the quant_lab repo, which is the recommended layout:
+#   trading_systems/
+#     quant_lab/         (this repo)
+#     pattern_finder/    (cloned from github.com/valetudo/pattern_finder)
+pattern_finder_path: "../pattern_finder"
+
+# Universe + sizing (placeholders until activation)
+universe: ['SPY']
+capital_per_trade_eur: 1000
+forward_window_days: 10
+
+notes: |
+  Adapter scaffolded in Phase 4 — the framework's plug-and-play registry
+  picks this up but the adapter itself returns no signals while
+  status='scaffold'.
+
+  To activate:
+   1. Clone github.com/valetudo/pattern_finder to pattern_finder_path
+   2. Install its dependencies (torch, lightgbm, hmmlearn, dtaidistance, faiss)
+   3. Implement the TODO sections in strategy.py:
+        - signal translation in generate_signals
+        - triple-barrier exit logic in manage_positions
+   4. Validate via walk-forward + benchmark comparison (see
+      docs/adding_a_strategy.md validation checklist)
+   5. Flip status: active here.

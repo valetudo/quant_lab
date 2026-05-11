@@ -11,6 +11,7 @@ Public entry points
 run_scrape(db, ...)   : full sync of both profiles (fixed_vanilla + zero_coupon)
 parse_results_html(...): pure-function parser, exposed for testability
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,10 +20,9 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
-
 from calculations import (
     coupon_from_name,
     currency_from_name,
@@ -31,12 +31,9 @@ from calculations import (
     issuer_type_from_name,
 )
 
-
 log = logging.getLogger(__name__)
 
-ADVANCED_SEARCH_URL = (
-    "https://www.borsaitaliana.it/borsa/obbligazioni/ricerca-avanzata.html"
-)
+ADVANCED_SEARCH_URL = "https://www.borsaitaliana.it/borsa/obbligazioni/ricerca-avanzata.html"
 
 # Anti-ban delay between pages (seconds). Kept minimal as the user asked.
 PAGE_DELAY_MIN = 0.6
@@ -58,6 +55,7 @@ class FilterStep:
     text of the <option> to pick (case-insensitive substring match
     is used at runtime).
     """
+
     select_id: str
     option_text: str
     label: str  # human-friendly name for logging
@@ -104,25 +102,55 @@ ESTERI_COUNTRIES: Tuple[str, ...] = (
     # would fail the filter step.
     "Italia",
     # Eurozone core
-    "Francia", "Germania", "Spagna", "Austria", "Belgio", "Olanda",
-    "Portogallo", "Finlandia", "Irlanda", "Lussemburgo",
+    "Francia",
+    "Germania",
+    "Spagna",
+    "Austria",
+    "Belgio",
+    "Olanda",
+    "Portogallo",
+    "Finlandia",
+    "Irlanda",
+    "Lussemburgo",
     # Eurozone periphery
-    "Grecia", "Cipro", "Slovenia", "Estonia", "Lettonia", "Lituania",
+    "Grecia",
+    "Cipro",
+    "Slovenia",
+    "Estonia",
+    "Lettonia",
+    "Lituania",
     # CEE (mostly EUR + own currency)
-    "Polonia", "Ungheria", "Romania", "Bulgaria", "Croazia",
+    "Polonia",
+    "Ungheria",
+    "Romania",
+    "Bulgaria",
+    "Croazia",
     # Non-eurozone Europe
-    "Gran Bretagna", "Svizzera", "Norvegia", "Svezia",
+    "Gran Bretagna",
+    "Svizzera",
+    "Norvegia",
+    "Svezia",
     # Non-Europe
-    "Stati Uniti", "Canada", "Cina, Repubblica Popolare Della",
-    "Filippine", "Honduras", "Costa D Avorio", "Jersey C.i.",
+    "Stati Uniti",
+    "Canada",
+    "Cina, Repubblica Popolare Della",
+    "Filippine",
+    "Honduras",
+    "Costa D Avorio",
+    "Jersey C.i.",
 )
 
 
 def _slugify(text: str) -> str:
     return (
         text.lower()
-        .replace("è", "e").replace("ì", "i").replace("ò", "o").replace("à", "a")
-        .replace(" ", "_").replace("'", "").replace(".", "")
+        .replace("è", "e")
+        .replace("ì", "i")
+        .replace("ò", "o")
+        .replace("à", "a")
+        .replace(" ", "_")
+        .replace("'", "")
+        .replace(".", "")
     )
 
 
@@ -160,19 +188,21 @@ def _build_profiles() -> List[ScrapeProfile]:
             )
             if tipologia == "Titoli Di Stato Esteri":
                 for country in ESTERI_COUNTRIES:
-                    profiles.append(ScrapeProfile(
-                        name=f"{_slugify(tipologia)}__{cedola_short}__{_slugify(country)}",
-                        label=f"{tipologia} – {country} – {cedola_value}",
-                        steps=base_steps + (
-                            FilterStep("countries", country, "Paese"),
-                        ),
-                    ))
+                    profiles.append(
+                        ScrapeProfile(
+                            name=f"{_slugify(tipologia)}__{cedola_short}__{_slugify(country)}",
+                            label=f"{tipologia} – {country} – {cedola_value}",
+                            steps=base_steps + (FilterStep("countries", country, "Paese"),),
+                        )
+                    )
             else:
-                profiles.append(ScrapeProfile(
-                    name=f"{_slugify(tipologia)}__{cedola_short}",
-                    label=f"{tipologia} – {cedola_value}",
-                    steps=base_steps,
-                ))
+                profiles.append(
+                    ScrapeProfile(
+                        name=f"{_slugify(tipologia)}__{cedola_short}",
+                        label=f"{tipologia} – {cedola_value}",
+                        steps=base_steps,
+                    )
+                )
     return profiles
 
 
@@ -310,13 +340,15 @@ def parse_results_html(html: str) -> List[dict]:
             _normalise_date(cells[isin_idx + 4]) if isin_idx + 4 < len(cells) else None
         ) or _normalise_date(" ".join(cells))
 
-        out.append({
-            "isin": isin,
-            "name": name or isin,
-            "ultimo_price": ultimo,
-            "coupon": coupon,
-            "maturity_date": maturity,
-        })
+        out.append(
+            {
+                "isin": isin,
+                "name": name or isin,
+                "ultimo_price": ultimo,
+                "coupon": coupon,
+                "maturity_date": maturity,
+            }
+        )
         seen.add(isin)
     return out
 
@@ -363,10 +395,12 @@ def _build_chrome_driver(headless: bool = True):
     """Build a Chrome webdriver. Imports kept local so the module loads even
     when Selenium isn't installed yet (useful for unit tests that exercise
     only the parser)."""
+    import os
+
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
-    import os
+
     os.environ.setdefault("WDM_SSL_VERIFY", "0")
     from webdriver_manager.chrome import ChromeDriverManager
 
@@ -476,20 +510,23 @@ def _set_select_by_id(driver, select_id: str, option_text: str, label: str = "")
     if result and result.get("ok"):
         log.info(
             "[scraper] %s = '%s'  (value=%s, text=%s, multi=%s, final=%s)",
-            log_label, option_text,
-            result.get("value"), result.get("text"),
-            result.get("is_multiple"), result.get("final_selection"),
+            log_label,
+            option_text,
+            result.get("value"),
+            result.get("text"),
+            result.get("is_multiple"),
+            result.get("final_selection"),
         )
         time.sleep(0.25)
         return True
-    log.error("[scraper] %s = '%s' FAILED: %s",
-              log_label, option_text, (result or {}).get("reason"))
+    log.error(
+        "[scraper] %s = '%s' FAILED: %s", log_label, option_text, (result or {}).get("reason")
+    )
     try:
         dump = driver.execute_script(_DUMP_SELECTS_JS) or []
         log.error("[scraper] DOM diagnostic — %d <select> elements:", len(dump))
         for s in dump[:25]:
-            log.error("[scraper]   id=%-22s opts=%s",
-                      str(s.get("id")), s.get("options"))
+            log.error("[scraper]   id=%-22s opts=%s", str(s.get("id")), s.get("options"))
     except Exception:
         pass
     return False
@@ -545,8 +582,8 @@ def _fetch_results_page(driver, base_url: str, page_n: int) -> str:
     `base_url` is the URL captured from the first submitSearchForm call,
     already carrying every filter and `size=N`. We strip any existing
     `page=` and append the requested page number. Returns raw HTML."""
-    cleaned = re.sub(r'[?&]page=\d+', '', base_url)
-    sep = '&' if '?' in cleaned else '?'
+    cleaned = re.sub(r"[?&]page=\d+", "", base_url)
+    sep = "&" if "?" in cleaned else "?"
     page_url = f"{cleaned}{sep}page={page_n}"
     driver.set_script_timeout(60)
     return driver.execute_async_script(
@@ -575,11 +612,14 @@ def _click_cerca(driver) -> bool:
         time.sleep(0.8)
         return True
     except Exception as exc_js:
-        log.warning("[scraper] submitSearchForm() failed: %s — falling back to #findButton click", exc_js)
+        log.warning(
+            "[scraper] submitSearchForm() failed: %s — falling back to #findButton click", exc_js
+        )
     # Fallback: click the actual <a id="findButton"> element
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
+
     try:
         link = WebDriverWait(driver, WAIT_FORM_SECONDS).until(
             EC.element_to_be_clickable((By.ID, "findButton"))
@@ -597,6 +637,7 @@ def _click_cerca(driver) -> bool:
 def _click_annulla(driver) -> bool:
     """Click ANNULLA between profiles to reset the form."""
     from selenium.webdriver.common.by import By
+
     try:
         btn = driver.find_element(
             By.XPATH,
@@ -657,6 +698,7 @@ def _wait_for_results(driver) -> bool:
 
 def _go_next_page(driver) -> bool:
     from selenium.webdriver.common.by import By
+
     try:
         link = driver.find_element(
             By.XPATH,
@@ -771,8 +813,12 @@ def _scrape_profile(
             try:
                 html_n = _fetch_results_page(driver, base_url, page_n)
             except Exception as exc:
-                log.warning("[scraper] %s page=%d fetch crashed: %s — stopping pagination",
-                            profile.name, page_n, exc)
+                log.warning(
+                    "[scraper] %s page=%d fetch crashed: %s — stopping pagination",
+                    profile.name,
+                    page_n,
+                    exc,
+                )
                 break
             recs_n = parse_results_html(html_n)
             new_recs = [r for r in recs_n if r["isin"] not in seen_isins]
@@ -789,10 +835,12 @@ def _scrape_profile(
                 break
         else:
             # Fell off the loop without break → MAX_PAGES_PER_PROFILE hit.
-            log.warning("[scraper] %s hit MAX_PAGES_PER_PROFILE=%d — there may "
-                        "still be more rows", profile.name, MAX_PAGES_PER_PROFILE)
-    log.info("[scraper] %s -> %d rows over %d page(s)",
-             profile.name, stats.rows, stats.pages)
+            log.warning(
+                "[scraper] %s hit MAX_PAGES_PER_PROFILE=%d — there may still be more rows",
+                profile.name,
+                MAX_PAGES_PER_PROFILE,
+            )
+    log.info("[scraper] %s -> %d rows over %d page(s)", profile.name, stats.rows, stats.pages)
     for rec in records:
         on_record(rec)
         stats.saved += 1
@@ -819,8 +867,9 @@ def run_scrape(
     target_date = target_date or date.today().isoformat()
     started = datetime.now().isoformat(timespec="seconds")
     results: Dict[str, dict] = {}
-    log.info("[scraper] run_scrape started at %s headless=%s dry_run=%s",
-             started, headless, dry_run)
+    log.info(
+        "[scraper] run_scrape started at %s headless=%s dry_run=%s", started, headless, dry_run
+    )
 
     driver = None
     try:
@@ -880,7 +929,9 @@ def run_scrape(
                 except Exception as exc:
                     log.warning(
                         "[scraper] upsert_bond failed for %s (%r): %s — skipping",
-                        isin, name[:60] if name else "", exc,
+                        isin,
+                        name[:60] if name else "",
+                        exc,
                     )
                     return
                 price = rec.get("ultimo_price")
@@ -890,7 +941,9 @@ def run_scrape(
                     except Exception as exc:
                         log.warning(
                             "[scraper] upsert_price failed for %s @ %s: %s",
-                            isin, target_date, exc,
+                            isin,
+                            target_date,
+                            exc,
                         )
 
             stats = _scrape_profile(
@@ -937,13 +990,17 @@ def run_scrape(
 def _cli() -> None:
     """python scraper.py [--dry-run] [--show] [--profile fixed_vanilla|zero_coupon]"""
     import argparse
+
     parser = argparse.ArgumentParser(description="Manual debug for the bonds scraper")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Don't write anything to the database")
-    parser.add_argument("--show", action="store_true",
-                        help="Run with a visible Chrome window")
-    parser.add_argument("--profile", choices=[p.name for p in SCRAPE_PROFILES],
-                        help="Run only one profile (default: all)")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Don't write anything to the database"
+    )
+    parser.add_argument("--show", action="store_true", help="Run with a visible Chrome window")
+    parser.add_argument(
+        "--profile",
+        choices=[p.name for p in SCRAPE_PROFILES],
+        help="Run only one profile (default: all)",
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -956,6 +1013,7 @@ def _cli() -> None:
         profiles = [p for p in SCRAPE_PROFILES if p.name == args.profile]
 
     from database import Database
+
     db = Database()
     out = run_scrape(
         db,

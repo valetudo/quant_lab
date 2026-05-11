@@ -2,11 +2,11 @@
 
 No I/O. Easy to unit-test.
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Iterable, List, Optional
-
 
 GOV_TAX_RATE = 0.125
 CORP_TAX_RATE = 0.26
@@ -40,16 +40,55 @@ def geo_area_from_isin(isin: str) -> str:
 # Currency extraction from bond names. Borsa Italiana uses both standard
 # 3-letter ISO codes (USD, GBP) and a 2-letter shorthand (EU=EUR, US=USD).
 _CCY_3LETTER = (
-    "EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "NZD",
-    "SEK", "NOK", "DKK", "PLN", "TRY", "BRL", "MXN", "ZAR",
-    "HUF", "CZK", "RON", "RUB", "CNY", "INR", "IDR", "PHP", "ITL",
+    "EUR",
+    "USD",
+    "GBP",
+    "CHF",
+    "JPY",
+    "CAD",
+    "AUD",
+    "NZD",
+    "SEK",
+    "NOK",
+    "DKK",
+    "PLN",
+    "TRY",
+    "BRL",
+    "MXN",
+    "ZAR",
+    "HUF",
+    "CZK",
+    "RON",
+    "RUB",
+    "CNY",
+    "INR",
+    "IDR",
+    "PHP",
+    "ITL",
 )
 _CCY_2LETTER = {
-    "EU": "EUR", "US": "USD", "GB": "GBP", "CH": "CHF", "JP": "JPY",
-    "CA": "CAD", "AU": "AUD", "NZ": "NZD", "SE": "SEK", "NO": "NOK",
-    "DK": "DKK", "PL": "PLN", "TR": "TRY", "BR": "BRL", "ZA": "ZAR",
-    "HU": "HUF", "CZ": "CZK", "RO": "RON", "RU": "RUB", "CN": "CNY",
-    "IN": "INR", "MX": "MXN",
+    "EU": "EUR",
+    "US": "USD",
+    "GB": "GBP",
+    "CH": "CHF",
+    "JP": "JPY",
+    "CA": "CAD",
+    "AU": "AUD",
+    "NZ": "NZD",
+    "SE": "SEK",
+    "NO": "NOK",
+    "DK": "DKK",
+    "PL": "PLN",
+    "TR": "TRY",
+    "BR": "BRL",
+    "ZA": "ZAR",
+    "HU": "HUF",
+    "CZ": "CZK",
+    "RO": "RON",
+    "RU": "RUB",
+    "CN": "CNY",
+    "IN": "INR",
+    "MX": "MXN",
 }
 
 
@@ -62,6 +101,7 @@ def currency_from_name(name: str, default: str = "EUR") -> str:
     the 2-letter map, and fall back to `default` (EUR).
     """
     import re as _re
+
     if not name:
         return default
     upper = name.upper()
@@ -82,19 +122,69 @@ def currency_from_name(name: str, default: str = "EUR") -> str:
 # Italy on coupons, like Italian govies.
 _SOVEREIGN_PREFIXES = (
     # Eurozone & EU
-    "FRANCE", "GERMANY", "ITALY", "ITALIA", "SPAIN", "BELGIUM", "NETHERLANDS",
-    "PORTUGAL", "AUSTRIA", "FINLAND", "GREECE", "IRELAND", "SLOVENIA",
-    "SLOVAKIA", "ESTONIA", "LATVIA", "LITHUANIA", "LUXEMBOURG", "CYPRUS",
-    "MALTA", "CROATIA", "BULGARIA", "ROMANIA", "POLAND", "HUNGARY",
-    "CZECH", "DENMARK", "SWEDEN", "NORWAY",
+    "FRANCE",
+    "GERMANY",
+    "ITALY",
+    "ITALIA",
+    "SPAIN",
+    "BELGIUM",
+    "NETHERLANDS",
+    "PORTUGAL",
+    "AUSTRIA",
+    "FINLAND",
+    "GREECE",
+    "IRELAND",
+    "SLOVENIA",
+    "SLOVAKIA",
+    "ESTONIA",
+    "LATVIA",
+    "LITHUANIA",
+    "LUXEMBOURG",
+    "CYPRUS",
+    "MALTA",
+    "CROATIA",
+    "BULGARIA",
+    "ROMANIA",
+    "POLAND",
+    "HUNGARY",
+    "CZECH",
+    "DENMARK",
+    "SWEDEN",
+    "NORWAY",
     # Anglo
-    "UNITED KINGDOM", "UK ", "USA", "U.S.", "CANADA", "AUSTRALIA", "NEW ZEALAND",
+    "UNITED KINGDOM",
+    "UK ",
+    "USA",
+    "U.S.",
+    "CANADA",
+    "AUSTRALIA",
+    "NEW ZEALAND",
     # Emerging
-    "TURKEY", "MEXICO", "BRAZIL", "CHILE", "PERU", "COLOMBIA", "ARGENTINA",
-    "INDIA", "INDONESIA", "PHILIPPINES", "SOUTH AFRICA", "JAPAN",
-    "RUSSIA", "CHINA", "ICELAND", "ISRAEL", "EGYPT", "MOROCCO",
-    "SERBIA", "MONTENEGRO", "ALBANIA", "MACEDONIA", "BOSNIA",
-    "UKRAINE", "BELARUS",
+    "TURKEY",
+    "MEXICO",
+    "BRAZIL",
+    "CHILE",
+    "PERU",
+    "COLOMBIA",
+    "ARGENTINA",
+    "INDIA",
+    "INDONESIA",
+    "PHILIPPINES",
+    "SOUTH AFRICA",
+    "JAPAN",
+    "RUSSIA",
+    "CHINA",
+    "ICELAND",
+    "ISRAEL",
+    "EGYPT",
+    "MOROCCO",
+    "SERBIA",
+    "MONTENEGRO",
+    "ALBANIA",
+    "MACEDONIA",
+    "BOSNIA",
+    "UKRAINE",
+    "BELARUS",
 )
 
 
@@ -112,25 +202,49 @@ def issuer_type_from_name(name: str) -> str:
             return "Government"
     govt_tokens = (
         # Sovereigns (Italian/EU shorthand and English)
-        "BTP", "BOT", "CTZ", "CCT", "OAT", "BUND", "BUNDEI", "TREASURY", "GILT",
-        "GGB",      # Greek Government Bond
-        "BOBL",     # German Federal Notes (5y)
-        "SCHATZ",   # German Federal Treasury Notes (2y)
-        "JGB",      # Japan Government Bond
-        "ACGB",     # Australian Commonwealth Government Bond
-        "BONOS", "BONO ",   # Spanish Government Bonds
-        "REPUBLIC", "REPUBBLICA", "SOVEREIGN", "GOVERNMENT", "GOVT",
+        "BTP",
+        "BOT",
+        "CTZ",
+        "CCT",
+        "OAT",
+        "BUND",
+        "BUNDEI",
+        "TREASURY",
+        "GILT",
+        "GGB",  # Greek Government Bond
+        "BOBL",  # German Federal Notes (5y)
+        "SCHATZ",  # German Federal Treasury Notes (2y)
+        "JGB",  # Japan Government Bond
+        "ACGB",  # Australian Commonwealth Government Bond
+        "BONOS",
+        "BONO ",  # Spanish Government Bonds
+        "REPUBLIC",
+        "REPUBBLICA",
+        "SOVEREIGN",
+        "GOVERNMENT",
+        "GOVT",
         # Supranationals (Italian white-list, taxed at 12.5%)
-        "EIB", "BEI ",            # European Investment Bank
-        "ESM ",                   # European Stability Mechanism
-        "EFSF",                   # European Financial Stability Facility
-        "EBRD",                   # European Bank for Reconstruction and Development
-        "EU NEXT GEN", "EU NEXTGEN",  # NextGenerationEU bonds (EU Commission)
-        "WORLD BANK", "WORLDBANK", "IBRD", "IFC", "IDA",
-        "ASIAN DEVELOPMENT", "ADB ",
-        "AFDB", "AFRICAN DEVELOPMENT",
-        "AIIB", "INTER-AMERICAN", "IADB",
-        "EUROFIMA", "NIB ",       # Nordic Investment Bank
+        "EIB",
+        "BEI ",  # European Investment Bank
+        "ESM ",  # European Stability Mechanism
+        "EFSF",  # European Financial Stability Facility
+        "EBRD",  # European Bank for Reconstruction and Development
+        "EU NEXT GEN",
+        "EU NEXTGEN",  # NextGenerationEU bonds (EU Commission)
+        "WORLD BANK",
+        "WORLDBANK",
+        "IBRD",
+        "IFC",
+        "IDA",
+        "ASIAN DEVELOPMENT",
+        "ADB ",
+        "AFDB",
+        "AFRICAN DEVELOPMENT",
+        "AIIB",
+        "INTER-AMERICAN",
+        "IADB",
+        "EUROFIMA",
+        "NIB ",  # Nordic Investment Bank
         "COUNCIL OF EUROPE",
     )
     if any(t in upper for t in govt_tokens):
@@ -187,14 +301,29 @@ def sovereign_nation_from_name(name: str) -> Optional[str]:
     should treat None as "not eligible for sovereign-rating comparison".
     """
     import re as _re
+
     if not name:
         return None
     upper = name.upper()
     # Skip obvious supranationals so they don't accidentally match a country
-    supranational_hints = ("EIB", "BEI ", "EFSF", "ESM ", "EBRD",
-                           "WORLD BANK", "WORLDBANK", "IBRD", "IFC",
-                           "AFDB", "AIIB", "EU NEXT GEN", "EU NEXTGEN",
-                           "ASIAN DEVELOPMENT", "INTER-AMERICAN", "EUROFIMA")
+    supranational_hints = (
+        "EIB",
+        "BEI ",
+        "EFSF",
+        "ESM ",
+        "EBRD",
+        "WORLD BANK",
+        "WORLDBANK",
+        "IBRD",
+        "IFC",
+        "AFDB",
+        "AIIB",
+        "EU NEXT GEN",
+        "EU NEXTGEN",
+        "ASIAN DEVELOPMENT",
+        "INTER-AMERICAN",
+        "EUROFIMA",
+    )
     if any(s in upper for s in supranational_hints):
         return None
     for pattern, nation in _SOVEREIGN_NATION_BY_TOKEN:
@@ -231,6 +360,7 @@ def is_inflation_linked(name: str) -> bool:
     accrual that we don't track.
     """
     import re as _re
+
     if not name:
         return False
     upper = name.upper()
@@ -271,6 +401,7 @@ def coupon_from_name(name: str) -> Optional[float]:
     annual coupon.
     """
     import re as _re
+
     if not name:
         return None
     upper = name.upper()
@@ -314,7 +445,9 @@ def coupon_from_name(name: str) -> Optional[float]:
     return None
 
 
-def years_to_maturity(maturity_date: Optional[str], reference: Optional[date] = None) -> Optional[float]:
+def years_to_maturity(
+    maturity_date: Optional[str], reference: Optional[date] = None
+) -> Optional[float]:
     """Return years between today and maturity date string (YYYY-MM-DD).
 
     Returns None if input is missing/invalid or in the past.
@@ -445,10 +578,7 @@ def enrich_bond(bond: dict, reference: Optional[date] = None) -> dict:
     # Authoritative sovereign nation: prefer the value persisted at scrape
     # time (the BI Paese filter we applied), fall back to the name-based
     # regex for legacy rows where `nation` is NULL.
-    out["sovereign_nation"] = (
-        bond.get("nation")
-        or sovereign_nation_from_name(out.get("name", ""))
-    )
+    out["sovereign_nation"] = bond.get("nation") or sovereign_nation_from_name(out.get("name", ""))
     if out["inflation_linked"]:
         out["net_yield_pa"] = None
     else:
@@ -503,7 +633,7 @@ def yield_by_nation(
     """
     by_nation: dict = {}
     lo, hi = yield_range
-    yr_lo, yr_hi = (years_range if years_range is not None else (None, None))
+    yr_lo, yr_hi = years_range if years_range is not None else (None, None)
     want_ccy = (currency or "").upper() if currency else None
     if sovereign_only and tipologie is None:
         tipologie = SOVEREIGN_TIPOLOGIE
@@ -538,19 +668,17 @@ def yield_by_nation(
             continue
         sorted_y = sorted(yields)
         n = len(sorted_y)
-        median = (
-            sorted_y[n // 2]
-            if n % 2 == 1
-            else (sorted_y[n // 2 - 1] + sorted_y[n // 2]) / 2
+        median = sorted_y[n // 2] if n % 2 == 1 else (sorted_y[n // 2 - 1] + sorted_y[n // 2]) / 2
+        out.append(
+            {
+                "nation": geo,
+                "count": n,
+                "avg": sum(yields) / n,
+                "min": sorted_y[0],
+                "max": sorted_y[-1],
+                "median": median,
+            }
         )
-        out.append({
-            "nation": geo,
-            "count": n,
-            "avg": sum(yields) / n,
-            "min": sorted_y[0],
-            "max": sorted_y[-1],
-            "median": median,
-        })
     out.sort(key=lambda r: r["avg"], reverse=True)
     return out
 
@@ -565,11 +693,13 @@ def find_anomalies(
     """Top-N Italian Government EUR bonds whose yield exceeds the mean of
     peers within +/- window_years of duration the most."""
     pool = [
-        b for b in bonds
+        b
+        for b in bonds
         if (b.get("geo_area") or "").lower() == "italia"
         and (b.get("currency") or "").upper() == "EUR"
         and (b.get("issuer_type") or "").lower() == "government"
-        and b.get("years_to_maturity") and b.get("years_to_maturity") > 0
+        and b.get("years_to_maturity")
+        and b.get("years_to_maturity") > 0
         and b.get("net_yield_pa") is not None
     ]
     if len(pool) < min_peers + 1:
@@ -577,22 +707,25 @@ def find_anomalies(
     out = []
     for p in pool:
         peers = [
-            q for q in pool
+            q
+            for q in pool
             if q["isin"] != p["isin"]
             and abs(q["years_to_maturity"] - p["years_to_maturity"]) <= window_years
         ]
         if len(peers) < min_peers:
             continue
         peer_mean = sum(q["net_yield_pa"] for q in peers) / len(peers)
-        out.append({
-            "isin": p["isin"],
-            "name": p.get("name"),
-            "maturity_date": p.get("maturity_date"),
-            "years": p["years_to_maturity"],
-            "yield": p["net_yield_pa"],
-            "peer_mean": peer_mean,
-            "peer_count": len(peers),
-            "spread": p["net_yield_pa"] - peer_mean,
-        })
+        out.append(
+            {
+                "isin": p["isin"],
+                "name": p.get("name"),
+                "maturity_date": p.get("maturity_date"),
+                "years": p["years_to_maturity"],
+                "yield": p["net_yield_pa"],
+                "peer_mean": peer_mean,
+                "peer_count": len(peers),
+                "spread": p["net_yield_pa"] - peer_mean,
+            }
+        )
     out.sort(key=lambda x: x["spread"], reverse=True)
     return out[:top_n]

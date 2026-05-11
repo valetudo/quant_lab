@@ -4,6 +4,7 @@ For Phase 1: returns DataFrames directly. The persistence path (writing
 into the GDS DuckDB) is delegated to global_data_storage's own ingest
 scripts — this provider is read-side convenience, not a writer.
 """
+
 from __future__ import annotations
 
 import logging
@@ -12,7 +13,7 @@ from typing import Sequence
 
 import pandas as pd
 
-from quant_lab.core.data.providers.base import BaseProvider
+from core.data.providers.base import BaseProvider
 
 log = logging.getLogger(__name__)
 
@@ -38,8 +39,12 @@ class YFinanceProvider(BaseProvider):
         if not tickers:
             return pd.DataFrame()
         data = yf.download(
-            tickers=list(tickers), start=str(start), end=str(end),
-            auto_adjust=False, progress=False, group_by="column",
+            tickers=list(tickers),
+            start=str(start),
+            end=str(end),
+            auto_adjust=False,
+            progress=False,
+            group_by="column",
         )
         if data is None or data.empty:
             return pd.DataFrame()

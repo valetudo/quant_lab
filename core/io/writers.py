@@ -1,7 +1,10 @@
 """Generic CSV/Parquet/JSON writers used by analytics and the dashboard."""
+
 from __future__ import annotations
+
 import json
 from pathlib import Path
+
 import pandas as pd
 
 

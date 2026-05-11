@@ -1,8 +1,10 @@
 """Streamlit cache helpers."""
+
 from __future__ import annotations
+
 import streamlit as st
 
-from quant_lab.core.data.storage import DataStorage, load_global_config
+from core.data.storage import DataStorage, load_global_config
 
 
 @st.cache_resource(show_spinner=False)

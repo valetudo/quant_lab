@@ -1,5 +1,7 @@
 """Cross-strategy equity correlation helpers."""
+
 from __future__ import annotations
+
 import pandas as pd
 
 

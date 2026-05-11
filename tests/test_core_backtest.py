@@ -1,11 +1,12 @@
 """End-to-end engine test with DummyBuyAndHold on synthetic data."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
-from quant_lab.core.backtest.engine import PortfolioBacktester
-from quant_lab.strategies._examples import DummyBuyAndHold
+from core.backtest.engine import PortfolioBacktester
+from strategies._examples import DummyBuyAndHold
 
 
 def _synthetic_panel():
@@ -20,8 +21,9 @@ def _synthetic_panel():
 def test_engine_runs_with_dummy_buy_and_hold():
     panel = _synthetic_panel()
     strat = DummyBuyAndHold(tickers=panel.columns.tolist(), initial_capital_eur=30_000)
-    bt = PortfolioBacktester(strat, panel, initial_capital_eur=30_000,
-                             commission_bps=5, slippage_bps=5)
+    bt = PortfolioBacktester(
+        strat, panel, initial_capital_eur=30_000, commission_bps=5, slippage_bps=5
+    )
     res = bt.run()
 
     assert not res.equity.empty

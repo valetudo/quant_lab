@@ -1,19 +1,19 @@
 """Tests for the Master Allocator + PortfolioAggregator."""
+
 from __future__ import annotations
 
-from datetime import date
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from quant_lab.portfolio.aggregator import PortfolioAggregator
-from quant_lab.portfolio.master_allocator import (
+from portfolio.aggregator import PortfolioAggregator
+from portfolio.master_allocator import (
     EqualWeightAllocator,
     FixedWeightAllocator,
     RegimeAwareAllocator,
 )
-from quant_lab.strategies._examples import DummyBuyAndHold
+from strategies._examples import DummyBuyAndHold
 
 
 def _synthetic_panel(seed: int = 0):
@@ -83,7 +83,9 @@ def test_portfolio_metrics_makes_sense():
     panel = _synthetic_panel()
     s1 = DummyBuyAndHold(tickers=["AAA"], strategy_id="dummy_x")
     pa = PortfolioAggregator(
-        strategies=[s1], panels={"dummy_x": panel}, total_capital_eur=50_000.0,
+        strategies=[s1],
+        panels={"dummy_x": panel},
+        total_capital_eur=50_000.0,
     )
     res = pa.run()
     assert res.portfolio_metrics

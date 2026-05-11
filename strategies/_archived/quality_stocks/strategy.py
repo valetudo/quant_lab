@@ -29,15 +29,15 @@ from typing import Optional
 import pandas as pd
 import yaml
 
-from quant_lab.core.strategy.base import Strategy
-from quant_lab.core.strategy.lifecycle import is_first_of_month
-from quant_lab.core.strategy.signals import Action, Position, Signal
-from quant_lab.strategies.quality_stocks.factors import (
+from core.strategy.base import Strategy
+from core.strategy.lifecycle import is_first_of_month
+from core.strategy.signals import Action, Position, Signal
+from strategies.quality_stocks.factors import (
     calculate_momentum,
     calculate_quality_score,
     extract_quality_factors,
 )
-from quant_lab.strategies.quality_stocks.regime import is_market_uptrend, regime_label
+from strategies.quality_stocks.regime import is_market_uptrend, regime_label
 
 log = logging.getLogger(__name__)
 
@@ -84,19 +84,59 @@ class QualityStocks(Strategy):
     def universe(self) -> list[str]:
         return list(self._universe_cache)
 
-    def on_init(self, history: pd.DataFrame) -> None:
+    def _universe_at(self, date: pd.Timestamp, history: pd.DataFrame) -> list[str]:
+        """Universe of candidate tickers at a given date.
+
+        Survivorship-aware mode (config flag ``survivorship_aware: true``) pulls
+        the historical constituents of the index AS OF ``date`` via FMP's
+        membership event log. The default (back-compat) uses the current set.
+
+        In both modes the returned list is intersected with the panel columns
+        so the engine can actually trade the names.
+        """
         if self._universe_in is not None:
             symbols = list(self._universe_in)
+        elif self.cfg.get("survivorship_aware", False):
+            mode = self.cfg.get("universe_mode", "point_in_time")
+            if mode != "point_in_time":
+                # explicit override — fall back to current
+                symbols = self.fmp.get_index_constituents("sp500")
+            else:
+                try:
+                    symbols = self.fmp.get_constituents_at_date("sp500", as_of=date)
+                except Exception as e:
+                    log.warning("point_in_time universe lookup failed at %s: %s — "
+                                "falling back to current", date, e)
+                    symbols = self.fmp.get_index_constituents("sp500")
         else:
             symbols = self.fmp.get_index_constituents("sp500")
-        # Filter to symbols that ALSO appear in the panel (engine will reject otherwise)
-        if not history.empty:
+        if history is not None and not history.empty:
             symbols = [s for s in symbols if s in history.columns]
+        return symbols
+
+    def on_init(self, history: pd.DataFrame) -> None:
+        # In current mode the universe is static — cache it once.
+        # In point-in-time mode the universe is recomputed per-rebalance in
+        # ``_select_picks`` so we leave the cache empty here; ``universe``
+        # property still reflects the most recent pick set via _universe_cache.
+        first_date = history.index[0] if history is not None and not history.empty else None
+        symbols = self._universe_at(first_date, history) if first_date is not None else []
         self._universe_cache = symbols
-        log.info("quality_stocks universe: %d symbols", len(symbols))
+        survivorship = bool(self.cfg.get("survivorship_aware", False))
+        log.info("quality_stocks universe: %d symbols (survivorship_aware=%s)",
+                 len(symbols), survivorship)
 
         if self._prefetch:
             self._prefetch_fundamentals(symbols)
+
+    # NOTE: limit=20 (not 10) so the walk-forward harness can step back as far
+    # as 2009. With limit=10 the prefetch silently returned the newest 10
+    # filings only, which made all pre-2015 backtest folds see ZERO usable
+    # quality factors (everything filtered by `filing_date <= rebalance_date`).
+    # 20 matches the typical depth of the FMP key-metrics cache (annual filings
+    # back to ~2005 for established names) so the cache hit-rate stays high.
+    # This is a data-pipeline fix, NOT a strategy parameter change.
+    _FUND_LIMIT = 20
 
     def _prefetch_fundamentals(self, symbols: list[str]) -> None:
         """Pull key-metrics + ratios for each symbol. Cached after first call."""
@@ -104,8 +144,8 @@ class QualityStocks(Strategy):
         from tqdm import tqdm
         for s in tqdm(symbols, desc="fundamentals", unit="sym", leave=False):
             try:
-                km = self.fmp.get_key_metrics(s, period="annual", limit=10)
-                rt = self.fmp.get_ratios(s, period="annual", limit=10)
+                km = self.fmp.get_key_metrics(s, period="annual", limit=self._FUND_LIMIT)
+                rt = self.fmp.get_ratios(s, period="annual", limit=self._FUND_LIMIT)
                 self._fundamentals[s] = {"km": km, "ratios": rt}
             except Exception as e:
                 log.warning("fundamentals fetch failed for %s: %s", s, e)
@@ -113,8 +153,8 @@ class QualityStocks(Strategy):
     def _get_fundamentals(self, symbol: str):
         if symbol not in self._fundamentals:
             try:
-                km = self.fmp.get_key_metrics(symbol, period="annual", limit=10)
-                rt = self.fmp.get_ratios(symbol, period="annual", limit=10)
+                km = self.fmp.get_key_metrics(symbol, period="annual", limit=self._FUND_LIMIT)
+                rt = self.fmp.get_ratios(symbol, period="annual", limit=self._FUND_LIMIT)
                 self._fundamentals[symbol] = {"km": km, "ratios": rt}
             except Exception:
                 self._fundamentals[symbol] = {"km": pd.DataFrame(), "ratios": pd.DataFrame()}
@@ -136,9 +176,21 @@ class QualityStocks(Strategy):
 
     def _select_picks(self, date: pd.Timestamp, history: pd.DataFrame) -> list[str]:
         """Returns the ordered list of symbols to hold from this rebalance forward."""
+        # In survivorship-aware mode, the candidate set itself changes per
+        # rebalance: at 2010-01 we should only consider names that were in
+        # the index AS OF 2010-01, not the current S&P 500 (which would
+        # include winners we couldn't have known about then).
+        if self.cfg.get("survivorship_aware", False):
+            current_universe = self._universe_at(date, history)
+            # Cache the current pick set so the engine's `.universe` property
+            # always reflects the most recent state.
+            self._universe_cache = current_universe
+        else:
+            current_universe = self._universe_cache
+
         # Quality factors
         factor_rows = {}
-        for s in self._universe_cache:
+        for s in current_universe:
             fd = self._get_fundamentals(s)
             f = extract_quality_factors(s, date, fd["km"], fd["ratios"])
             if f:
@@ -164,6 +216,12 @@ class QualityStocks(Strategy):
 
     # ---- engine hooks ---------------------------------------------------
 
+    def _trend_kwargs(self) -> dict:
+        return dict(
+            short_ma=int(self.cfg.get("trend_short_ma", 50)),
+            long_ma=int(self.cfg.get("trend_long_ma", 200)),
+        )
+
     def generate_signals(
         self,
         date: pd.Timestamp,
@@ -175,8 +233,9 @@ class QualityStocks(Strategy):
             return []
         # Build SPY series for regime filter
         spy_series = history[self.spy_symbol] if self.spy_symbol in history.columns else None
-        uptrend = is_market_uptrend(spy_series, date) if spy_series is not None else True
-        regime = regime_label(spy_series, date) if spy_series is not None else "unknown"
+        trend_kw = self._trend_kwargs()
+        uptrend = is_market_uptrend(spy_series, date, **trend_kw) if spy_series is not None else True
+        regime = regime_label(spy_series, date, **trend_kw) if spy_series is not None else "unknown"
 
         picks = self._select_picks(date, history)
         self._selected_now = picks
@@ -236,7 +295,7 @@ class QualityStocks(Strategy):
             # First rebalance not done yet; close nothing.
             return []
         spy_series = history[self.spy_symbol] if self.spy_symbol in history.columns else None
-        uptrend = is_market_uptrend(spy_series, date) if spy_series is not None else True
+        uptrend = is_market_uptrend(spy_series, date, **self._trend_kwargs()) if spy_series is not None else True
 
         new_set = set(self._selected_now)
         actions: list[Action] = []

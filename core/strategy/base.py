@@ -1,10 +1,12 @@
 """Strategy ABC — every strategy in quant_lab subclasses this."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+
 import pandas as pd
 
-from quant_lab.core.strategy.signals import Signal, Action, Position
+from core.strategy.signals import Action, Position, Signal
 
 
 class Strategy(ABC):

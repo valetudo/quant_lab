@@ -1,7 +1,9 @@
 """Portfolio-level report generation. Scaffold."""
+
 from __future__ import annotations
-from pathlib import Path
+
 import json
+from pathlib import Path
 
 
 def write_portfolio_report(outputs: dict, dest: str | Path) -> Path:

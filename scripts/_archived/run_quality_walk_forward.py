@@ -1,13 +1,20 @@
 """Walk-forward validation for QualityStocks.
 
-3 folds, train 4y / test 1y, step 1y. Parameters are fixed (never tuned
-per-fold). Output: distribution of OOS Sharpe / max DD per fold, with an
-automatic verdict (ROBUST / MARGINAL / OVERFIT).
+5 folds (default), train 4y / test 1y, step 1y. Parameters are FIXED across
+folds — no per-fold tuning. Output: distribution of OOS Sharpe / max DD per
+fold, with an automatic verdict (ROBUST / MARGINAL / OVERFIT).
 
-VERDICT thresholds (median OOS Sharpe across folds):
+Verdict thresholds (median OOS Sharpe across folds):
     >= 0.40  ROBUST
     >= 0.20  MARGINAL
     <  0.20  OVERFIT
+
+Phase 3 additions:
+  - ``--config``   : pick a non-default strategy YAML (e.g. variant configs)
+  - ``--variant``  : label used in the output directory
+                     (outputs/quality_stocks/walkforward_<variant>/)
+  - Per-fold OOS equity curve is now saved alongside the verdict, so the
+    comparison dashboard can concatenate OOS series across folds.
 """
 from __future__ import annotations
 
@@ -20,21 +27,20 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
-# --- bootstrap ---
+# --- bootstrap: add repo root to sys.path (no pip install needed) ---
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_PARENT = _REPO_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 # ---
 
 import pandas as pd
 
-from quant_lab.core.analytics.metrics import compute_metrics
-from quant_lab.core.backtest.engine import PortfolioBacktester
-from quant_lab.core.data.providers.fmp_provider import FMPProvider
-from quant_lab.core.data.storage import DataStorage, load_global_config
-from quant_lab.strategies.quality_stocks import QualityStocks
-from quant_lab.strategies.quality_stocks.runner import build_panel
+from core.analytics.metrics import compute_metrics
+from core.backtest.engine import PortfolioBacktester
+from core.data.providers.fmp_provider import FMPProvider
+from core.data.storage import DataStorage, load_global_config
+from strategies.quality_stocks import QualityStocks
+from strategies.quality_stocks.runner import build_panel
 
 log = logging.getLogger("walk_forward_quality")
 
@@ -71,7 +77,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--capital", type=float, default=100_000.0)
     ap.add_argument("--commission-bps", type=float, default=5.0)
     ap.add_argument("--slippage-bps", type=float, default=5.0)
-    ap.add_argument("--out", default=None)
+    ap.add_argument("--config", default=None,
+                    help="path to a strategy YAML; defaults to "
+                         "strategies/quality_stocks/config.yaml")
+    ap.add_argument("--variant", default="baseline",
+                    help="label used in the output directory + verdict JSON")
+    ap.add_argument("--out", default=None,
+                    help="override output directory (default: "
+                         "outputs/quality_stocks/walkforward_<variant>/)")
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO,
@@ -80,11 +93,11 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_global_config()
     storage = DataStorage.from_config(cfg)
     fmp = FMPProvider()
+    config_path = Path(args.config) if args.config else None
 
     universe = fmp.get_index_constituents("sp500")
-    log.info("universe: %d", len(universe))
+    log.info("variant=%s   universe: %d", args.variant, len(universe))
 
-    # One panel for the whole window (cached after first load)
     panel = build_panel(storage, start=args.start, end=args.end,
                         universe_symbols=universe, extra=("SPY", "IEF"))
     if panel.empty:
@@ -99,7 +112,14 @@ def main(argv: list[str] | None = None) -> int:
         log.error("no folds — window too short")
         return 2
 
-    fold_results = []
+    out_root = Path(args.out) if args.out else (
+        _REPO_ROOT / "outputs" / "quality_stocks" / f"walkforward_{args.variant}"
+    )
+    out_root.mkdir(parents=True, exist_ok=True)
+    log.info("output dir: %s", out_root)
+
+    fold_results: list[dict] = []
+    oos_equities: list[pd.Series] = []   # for concatenation
     for k, (tr_s, tr_e, te_s, te_e) in enumerate(windows):
         log.info("fold %d/%d  train %s..%s  test %s..%s",
                  k + 1, len(windows), tr_s, tr_e, te_s, te_e)
@@ -107,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         if test_panel.empty:
             log.warning("fold %d empty test panel", k)
             continue
-        strat = QualityStocks(fmp=fmp, prefetch=False)  # prefetch happens on demand
+        strat = QualityStocks(fmp=fmp, prefetch=False, config_path=config_path)
         bt = PortfolioBacktester(strat, test_panel,
                                  initial_capital_eur=args.capital,
                                  commission_bps=args.commission_bps,
@@ -131,9 +151,35 @@ def main(argv: list[str] | None = None) -> int:
             total_return_pct=metrics.get("total_return_pct"),
             final_equity=metrics.get("final_equity"),
         ))
+        # Save per-fold equity CSV
+        fold_dir = out_root / f"fold_{k+1:02d}_{te_s}_{te_e}"
+        fold_dir.mkdir(parents=True, exist_ok=True)
+        if not eq.empty:
+            eq.to_csv(fold_dir / "equity.csv", header=["equity_eur"])
+            # For concatenation: normalize each fold to start at 1.0 then chain
+            norm = eq / eq.iloc[0]
+            norm.name = "eq_norm"
+            oos_equities.append(norm)
+        fold_dir.joinpath("metrics.json").write_text(
+            json.dumps(metrics, indent=2, default=str), encoding="utf-8")
         log.info("  -> sharpe=%.2f trades=%d return=%.2f%%",
                  metrics.get("sharpe") or 0,
                  len(res.trades), metrics.get("total_return_pct") or 0)
+
+    # Concatenated OOS equity: chain folds in date order.
+    if oos_equities:
+        chained: list[float] = []
+        chained_idx: list[pd.Timestamp] = []
+        running = args.capital
+        for s in oos_equities:
+            # series is normalised so s.iloc[0] == 1.0
+            for ts, v in s.items():
+                chained.append(float(v) * running)
+                chained_idx.append(ts)
+            running = chained[-1]
+        oos_concat = pd.Series(chained, index=chained_idx, name="equity_oos_eur")
+        oos_concat.to_csv(out_root / "equity_oos_concatenated.csv",
+                          header=["equity_oos_eur"])
 
     # Aggregate verdict
     sharpes = [r["sharpe"] for r in fold_results if r["sharpe"] is not None
@@ -144,7 +190,6 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sharpes.sort()
         median = statistics.median(sharpes)
-        # Simple quartile approximation
         n = len(sharpes)
         p25 = sharpes[max(0, n // 4)] if n > 1 else sharpes[0]
         p75 = sharpes[min(n - 1, (3 * n) // 4)] if n > 1 else sharpes[0]
@@ -152,6 +197,8 @@ def main(argv: list[str] | None = None) -> int:
 
     out = dict(
         strategy_id="quality_stocks",
+        variant=args.variant,
+        config_path=str(config_path) if config_path else "(default)",
         generated_at=datetime.utcnow().isoformat(),
         window={"start": str(args.start), "end": str(args.end)},
         params={
@@ -172,17 +219,18 @@ def main(argv: list[str] | None = None) -> int:
         },
     )
 
-    out_path = Path(args.out) if args.out else (
-        _REPO_ROOT / "outputs" / "quality_stocks" / "walk_forward_verdict.json"
-    )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(out, indent=2, default=str), encoding="utf-8")
+    verdict_path = out_root / "walk_forward_verdict.json"
+    verdict_path.write_text(json.dumps(out, indent=2, default=str), encoding="utf-8")
+    # Back-compat: baseline variant ALSO writes to the legacy location
+    # so the Quality Stocks page banner keeps working.
+    if args.variant == "baseline":
+        legacy = _REPO_ROOT / "outputs" / "quality_stocks" / "walk_forward_verdict.json"
+        legacy.write_text(json.dumps(out, indent=2, default=str), encoding="utf-8")
 
-    badge = {"ROBUST": "ROBUST", "MARGINAL": "MARGINAL",
-             "OVERFIT": "OVERFIT"}.get(verdict, verdict)
+    badge = verdict
     print(json.dumps(out, indent=2, default=str))
-    print(f"\nVERDICT: {badge}  (median Sharpe OOS = {median:.3f})")
-    print(f"saved -> {out_path}")
+    print(f"\nVARIANT: {args.variant}  VERDICT: {badge}  (median Sharpe OOS = {median:.3f})")
+    print(f"saved -> {verdict_path}")
     return 0
 
 

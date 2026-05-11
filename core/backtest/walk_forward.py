@@ -4,6 +4,7 @@ Given a strategy factory and a wide price panel, split the timeline into
 rolling (train, test) windows and run a backtest on each. Reports
 per-fold OOS metrics so the caller can assess overfit / instability.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -11,9 +12,9 @@ from typing import Callable
 
 import pandas as pd
 
-from quant_lab.core.analytics.metrics import compute_metrics
-from quant_lab.core.backtest.engine import PortfolioBacktester
-from quant_lab.core.strategy.base import Strategy
+from core.analytics.metrics import compute_metrics
+from core.backtest.engine import PortfolioBacktester
+from core.strategy.base import Strategy
 
 
 @dataclass
@@ -35,11 +36,21 @@ class WalkForwardResult:
         rows = [
             dict(
                 fold=f.fold_index,
-                train_start=f.train_start, train_end=f.train_end,
-                test_start=f.test_start, test_end=f.test_end,
-                **{k: f.metrics.get(k) for k in
-                   ("sharpe", "sortino", "calmar", "max_drawdown",
-                    "total_return_pct", "n_trades")},
+                train_start=f.train_start,
+                train_end=f.train_end,
+                test_start=f.test_start,
+                test_end=f.test_end,
+                **{
+                    k: f.metrics.get(k)
+                    for k in (
+                        "sharpe",
+                        "sortino",
+                        "calmar",
+                        "max_drawdown",
+                        "total_return_pct",
+                        "n_trades",
+                    )
+                },
             )
             for f in self.folds
         ]
@@ -87,20 +98,26 @@ def walk_forward(
             continue
         strat = strategy_factory()
         bt = PortfolioBacktester(
-            strat, test_panel,
+            strat,
+            test_panel,
             initial_capital_eur=initial_capital_eur,
-            commission_bps=commission_bps, slippage_bps=slippage_bps,
+            commission_bps=commission_bps,
+            slippage_bps=slippage_bps,
         )
         res = bt.run()
         eq = res.equity["equity"] if not res.equity.empty else pd.Series(dtype=float)
-        metrics = compute_metrics(eq, res.trades, initial_capital_eur,
-                                  open_count=res.open_count, exposure=res.exposure)
-        out.folds.append(WalkForwardFold(
-            fold_index=k,
-            train_start=panel.index[max(0, panel.index.get_loc(te) - train_days + 1)],
-            train_end=te,
-            test_start=os, test_end=oe,
-            metrics=metrics,
-            n_trades=len(res.trades),
-        ))
+        metrics = compute_metrics(
+            eq, res.trades, initial_capital_eur, open_count=res.open_count, exposure=res.exposure
+        )
+        out.folds.append(
+            WalkForwardFold(
+                fold_index=k,
+                train_start=panel.index[max(0, panel.index.get_loc(te) - train_days + 1)],
+                train_end=te,
+                test_start=os,
+                test_end=oe,
+                metrics=metrics,
+                n_trades=len(res.trades),
+            )
+        )
     return out

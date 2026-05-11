@@ -12,7 +12,7 @@ from typing import Optional
 
 import pandas as pd
 
-from quant_lab.core.data.storage import DataStorage
+from core.data.storage import DataStorage
 
 log = logging.getLogger(__name__)
 

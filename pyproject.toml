@@ -44,22 +44,25 @@ dev = [
     "mypy>=1.10",
 ]
 
-[tool.setuptools]
-package-dir = { "quant_lab" = "." }
-
+# Packaging layout — NOT USED in phase 1-2.
+# Phase 1-2 runs directly from the repo root (sys.path bootstrap via
+# conftest.py / ui/main.py); the project is not installed via `pip install -e .`.
+# The section below is a flat-layout sketch reserved for a future phase
+# when we decide to ship as an installable package. Until then, top-level
+# packages are `core`, `strategies`, `portfolio`, `ui` — imported without prefix.
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["core*", "strategies*", "portfolio*", "ui*"]
 exclude = ["tests*", "_backups*", "_migration_log*", "outputs*", "logs*", "docs*"]
 namespaces = false
 
-[tool.setuptools.package-data]
-"quant_lab" = ["configs/*.yaml", "strategies/*/config.yaml"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests", "strategies"]
 python_files = ["test_*.py"]
-addopts = "-ra"
+# Skip the _archived/ tree — those tests reference module paths that no
+# longer exist after Phase-4 archival.
+norecursedirs = ["_archived", "_legacy", "_backups", ".venv", "__pycache__"]
+addopts = "-ra --ignore=strategies/_archived --ignore=scripts/_archived"
 
 [tool.ruff]
 line-length = 100

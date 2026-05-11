@@ -3,11 +3,12 @@
 Uses the enrichment helpers from `core.data.providers._bonds_impl.calculations`
 (which contain the proven yield/duration/anomaly logic from the bonds project).
 """
+
 from __future__ import annotations
 
 from typing import Iterable
 
-from quant_lab.core.data.providers._bonds_impl import calculations as _calc
+from core.data.providers._bonds_impl import calculations as _calc
 
 
 def filter_bonds(
@@ -54,7 +55,7 @@ def select_top_n(
     """Sort bonds by `sort_by` then return the top N."""
     rows = list(bonds)
     rows.sort(key=lambda b: b.get(sort_by) or 0.0, reverse=descending)
-    return rows[:max(0, int(n))]
+    return rows[: max(0, int(n))]
 
 
 def enrich_and_select(

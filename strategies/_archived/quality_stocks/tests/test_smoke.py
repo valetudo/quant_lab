@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant_lab.strategies.quality_stocks.factors import (
+from strategies.quality_stocks.factors import (
     calculate_momentum,
     calculate_quality_score,
     extract_quality_factors,
 )
-from quant_lab.strategies.quality_stocks.regime import is_market_uptrend, regime_label
+from strategies.quality_stocks.regime import is_market_uptrend, regime_label
 
 
 def _fake_km(symbol: str, roic_values: list[float], filing_dates: list[str]) -> pd.DataFrame:

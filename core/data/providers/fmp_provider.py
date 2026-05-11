@@ -21,6 +21,7 @@ Caching:
   - Fundamentals: keyed by (symbol, statement_type, filing_date, period).
   - Cache is read-through (try cache first, fall back to API).
 """
+
 from __future__ import annotations
 
 import json
@@ -36,7 +37,7 @@ from typing import Iterable, Optional
 import pandas as pd
 import requests
 
-from quant_lab.core.data.providers.base import BaseProvider
+from core.data.providers.base import BaseProvider
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ def _sanitise_url(url: str, key: str) -> str:
 
 
 # ---- rate limiter --------------------------------------------------------
+
 
 class TokenBucket:
     """Simple token-bucket rate limiter (calls per second)."""
@@ -120,6 +122,17 @@ CREATE TABLE IF NOT EXISTS index_constituents (
     PRIMARY KEY (index_name, symbol, added_date)
 );
 
+CREATE TABLE IF NOT EXISTS index_membership_history (
+    index_name VARCHAR,
+    symbol VARCHAR,
+    action VARCHAR,            -- 'added' | 'removed'
+    effective_date DATE,
+    reason VARCHAR,
+    name_at_time VARCHAR,
+    fetched_at TIMESTAMP,
+    PRIMARY KEY (index_name, symbol, effective_date, action)
+);
+
 CREATE TABLE IF NOT EXISTS api_calls (
     timestamp TIMESTAMP,
     endpoint VARCHAR,
@@ -148,6 +161,7 @@ class FMPCache:
 
     def _connect(self):
         import duckdb
+
         return duckdb.connect(str(self.path))
 
     def _init_schema(self) -> None:
@@ -185,8 +199,17 @@ class FMPCache:
         out["fetched_at"] = datetime.utcnow()
         out = out.reset_index().rename(columns={"index": "date"})
         # Ensure column set matches schema
-        cols = ["symbol", "date", "open", "high", "low", "close",
-                "adj_close", "volume", "fetched_at"]
+        cols = [
+            "symbol",
+            "date",
+            "open",
+            "high",
+            "low",
+            "close",
+            "adj_close",
+            "volume",
+            "fetched_at",
+        ]
         for c in cols:
             if c not in out.columns:
                 out[c] = None
@@ -196,16 +219,16 @@ class FMPCache:
         with self._connect() as con:
             con.register("_stage_df", out)
             con.execute(
-                "DELETE FROM prices WHERE (symbol, date) IN "
-                "(SELECT symbol, date FROM _stage_df)"
+                "DELETE FROM prices WHERE (symbol, date) IN (SELECT symbol, date FROM _stage_df)"
             )
             con.execute("INSERT INTO prices SELECT * FROM _stage_df")
             con.unregister("_stage_df")
         self.stats.writes += len(out)
         return len(out)
 
-    def has_prices_for_window(self, symbol: str, start: date, end: date,
-                              max_age_days: int = 1) -> bool:
+    def has_prices_for_window(
+        self, symbol: str, start: date, end: date, max_age_days: int = 1
+    ) -> bool:
         """Return True iff there is a fresh cache row whose date >= end - 5d.
 
         Heuristic: if the most recent cached row in the range is at most
@@ -234,8 +257,9 @@ class FMPCache:
 
     # ---- fundamentals --------------------------------------------------
 
-    def get_fundamentals(self, symbol: str, statement_type: str,
-                         period: str = "annual") -> pd.DataFrame:
+    def get_fundamentals(
+        self, symbol: str, statement_type: str, period: str = "annual"
+    ) -> pd.DataFrame:
         with self._connect() as con:
             df = con.execute(
                 """
@@ -252,8 +276,9 @@ class FMPCache:
             self.stats.hits += 1
         return df
 
-    def put_fundamentals(self, symbol: str, statement_type: str,
-                         period: str, rows: list[dict]) -> int:
+    def put_fundamentals(
+        self, symbol: str, statement_type: str, period: str, rows: list[dict]
+    ) -> int:
         if not rows:
             return 0
         ins_rows = []
@@ -268,10 +293,17 @@ class FMPCache:
                 continue
             if fd is None or pe is None:
                 continue
-            ins_rows.append((
-                symbol, statement_type, fd, pe, period,
-                json.dumps(r, default=str), fetched,
-            ))
+            ins_rows.append(
+                (
+                    symbol,
+                    statement_type,
+                    fd,
+                    pe,
+                    period,
+                    json.dumps(r, default=str),
+                    fetched,
+                )
+            )
         if not ins_rows:
             return 0
         with self._connect() as con:
@@ -314,6 +346,7 @@ class FMPProvider(BaseProvider):
         if api_key is None:
             try:
                 from dotenv import load_dotenv
+
                 if env_path is None:
                     # Default: <project_root>/.env (3 parents up from this file)
                     env_path = Path(__file__).resolve().parents[3] / ".env"
@@ -322,9 +355,7 @@ class FMPProvider(BaseProvider):
                 pass
             api_key = os.getenv("FMP_API_KEY")
         if not api_key:
-            raise RuntimeError(
-                "FMP_API_KEY missing. Set it in .env or pass api_key=..."
-            )
+            raise RuntimeError("FMP_API_KEY missing. Set it in .env or pass api_key=...")
         self._api_key = api_key
         # Default cache lives under quant_lab/data_storage/cache/
         if cache_path is None:
@@ -341,8 +372,15 @@ class FMPProvider(BaseProvider):
 
     # ---- low-level GET -------------------------------------------------
 
-    def _get(self, endpoint: str, params: dict, *, base: str = BASE_URL,
-             symbol_for_log: Optional[str] = None, max_retries: int = 3):
+    def _get(
+        self,
+        endpoint: str,
+        params: dict,
+        *,
+        base: str = BASE_URL,
+        symbol_for_log: Optional[str] = None,
+        max_retries: int = 3,
+    ):
         """HTTP GET with rate limit, retries, and call logging."""
         params = dict(params or {})
         params["apikey"] = self._api_key
@@ -356,8 +394,13 @@ class FMPProvider(BaseProvider):
                 r = self._session.get(url, params=params, timeout=30)
             except (requests.RequestException, OSError) as e:
                 last_exc = e
-                log.warning("FMP network error on %s (attempt %d/%d): %s",
-                            endpoint, attempt + 1, max_retries, e)
+                log.warning(
+                    "FMP network error on %s (attempt %d/%d): %s",
+                    endpoint,
+                    attempt + 1,
+                    max_retries,
+                    e,
+                )
                 time.sleep(1 + attempt * 2)
                 continue
             elapsed_ms = int((time.monotonic() - t0) * 1000)
@@ -375,12 +418,18 @@ class FMPProvider(BaseProvider):
             if r.status_code == 429:
                 self._consecutive_429 += 1
                 backoff = min(60.0, 1.5 ** (attempt + 1))
-                log.warning("FMP 429 on %s (attempt %d/%d). Sleeping %.1fs",
-                            endpoint, attempt + 1, max_retries, backoff)
+                log.warning(
+                    "FMP 429 on %s (attempt %d/%d). Sleeping %.1fs",
+                    endpoint,
+                    attempt + 1,
+                    max_retries,
+                    backoff,
+                )
                 # If we hit 429 repeatedly, fall back to slow rate
                 if self._consecutive_429 >= 3:
-                    log.warning("3 consecutive 429s -> reducing rate to %.1f/s",
-                                SLOW_CALLS_PER_SECOND)
+                    log.warning(
+                        "3 consecutive 429s -> reducing rate to %.1f/s", SLOW_CALLS_PER_SECOND
+                    )
                     self._bucket = TokenBucket(rate_per_second=SLOW_CALLS_PER_SECOND)
                 time.sleep(backoff)
                 continue
@@ -388,16 +437,20 @@ class FMPProvider(BaseProvider):
                 log.warning("FMP 403 on %s — plan tier may not include this endpoint", endpoint)
                 return None
             if 500 <= r.status_code < 600:
-                log.warning("FMP %d on %s (attempt %d/%d)", r.status_code, endpoint,
-                            attempt + 1, max_retries)
+                log.warning(
+                    "FMP %d on %s (attempt %d/%d)",
+                    r.status_code,
+                    endpoint,
+                    attempt + 1,
+                    max_retries,
+                )
                 time.sleep(1 + attempt * 2)
                 continue
             # 4xx other than 429/403: log and bail
             log.warning("FMP HTTP %d on %s: %s", r.status_code, endpoint, r.text[:200])
             return None
         if last_exc:
-            log.warning("FMP %s gave up after %d attempts: %s",
-                        endpoint, max_retries, last_exc)
+            log.warning("FMP %s gave up after %d attempts: %s", endpoint, max_retries, last_exc)
         return None
 
     # ---- public API ----------------------------------------------------
@@ -462,6 +515,7 @@ class FMPProvider(BaseProvider):
         if progress:
             try:
                 from tqdm import tqdm
+
                 iterator = tqdm(syms, desc="FMP prices", unit="sym")
             except ImportError:
                 pass
@@ -487,8 +541,13 @@ class FMPProvider(BaseProvider):
 
         Returns DataFrame with columns derived from JSON + parsed filing_date.
         """
-        valid = {"income-statement", "balance-sheet-statement", "cash-flow-statement",
-                 "key-metrics", "ratios"}
+        valid = {
+            "income-statement",
+            "balance-sheet-statement",
+            "cash-flow-statement",
+            "key-metrics",
+            "ratios",
+        }
         if statement_type not in valid:
             raise ValueError(f"unknown statement_type: {statement_type}")
 
@@ -530,21 +589,27 @@ class FMPProvider(BaseProvider):
         elif "acceptedDate" in df.columns:
             df["filing_date"] = pd.to_datetime(df["acceptedDate"], errors="coerce")
         else:
-            df["filing_date"] = pd.to_datetime(df.get("date"), errors="coerce") + pd.Timedelta(days=90)
+            df["filing_date"] = pd.to_datetime(df.get("date"), errors="coerce") + pd.Timedelta(
+                days=90
+            )
         if "date" in df.columns:
             df["period_end_date"] = pd.to_datetime(df["date"], errors="coerce")
         df = df.sort_values("filing_date", ascending=False).head(limit)
         return df
 
-    def get_key_metrics(self, symbol: str, *, period: str = "annual",
-                        limit: int = 20, force_refresh: bool = False) -> pd.DataFrame:
-        return self.get_fundamentals(symbol, "key-metrics", period=period,
-                                     limit=limit, force_refresh=force_refresh)
+    def get_key_metrics(
+        self, symbol: str, *, period: str = "annual", limit: int = 20, force_refresh: bool = False
+    ) -> pd.DataFrame:
+        return self.get_fundamentals(
+            symbol, "key-metrics", period=period, limit=limit, force_refresh=force_refresh
+        )
 
-    def get_ratios(self, symbol: str, *, period: str = "annual",
-                   limit: int = 20, force_refresh: bool = False) -> pd.DataFrame:
-        return self.get_fundamentals(symbol, "ratios", period=period,
-                                     limit=limit, force_refresh=force_refresh)
+    def get_ratios(
+        self, symbol: str, *, period: str = "annual", limit: int = 20, force_refresh: bool = False
+    ) -> pd.DataFrame:
+        return self.get_fundamentals(
+            symbol, "ratios", period=period, limit=limit, force_refresh=force_refresh
+        )
 
     # ---- index constituents -------------------------------------------
 
@@ -561,33 +626,257 @@ class FMPProvider(BaseProvider):
             return []
         return sorted({row.get("symbol") for row in data if row.get("symbol")})
 
-    def get_historical_index_constituents(self, index: str = "sp500") -> pd.DataFrame:
+    def get_historical_index_constituents(
+        self,
+        index: str = "sp500",
+        *,
+        force_refresh: bool = False,
+        cache_ttl_days: int = 30,
+    ) -> pd.DataFrame:
+        """Membership change events for an index (S&P 500 supported).
+
+        Returns ONE ROW PER CHANGE EVENT. The FMP response gives 1 row per
+        add/remove SWAP (one ticker enters as another exits on the same date);
+        this method explodes that into 2 rows — one with ``action='added'`` and
+        one with ``action='removed'`` — so the table is naturally event-keyed.
+
+        Columns: ``index_name, symbol, action, effective_date, reason,
+        name_at_time, fetched_at``.
+
+        Cached in DuckDB (``index_membership_history``). Refresh policy:
+        ``cache_ttl_days`` (default 30 d — membership changes are slow).
+        """
         endpoint = {"sp500": "historical-sp500-constituent"}.get(index.lower())
         if not endpoint:
             log.warning("no historical constituents endpoint for %s", index)
             return pd.DataFrame()
+
+        # Cache check — TTL on the most recent fetched_at timestamp
+        if not force_refresh:
+            with self.cache._connect() as con:
+                stale = con.execute(
+                    "SELECT MAX(fetched_at) FROM index_membership_history WHERE index_name = ?",
+                    [index.lower()],
+                ).fetchone()[0]
+            if stale is not None:
+                age = datetime.utcnow() - pd.to_datetime(stale).to_pydatetime().replace(tzinfo=None)
+                if age.days < cache_ttl_days:
+                    return self._load_membership_from_cache(index.lower())
+
         data = self._get(endpoint, {})
         if not data or not isinstance(data, list):
-            return pd.DataFrame()
-        return pd.DataFrame(data)
+            return self._load_membership_from_cache(index.lower())
+
+        # Explode {date, symbol (added), removedTicker} into two rows
+        rows: list[dict] = []
+        fetched_at = datetime.utcnow()
+        for ev in data:
+            ev_date = ev.get("date") or ev.get("dateAdded")
+            if not ev_date:
+                continue
+            try:
+                eff = pd.to_datetime(ev_date).date()
+            except Exception:
+                continue
+            reason = (ev.get("reason") or "").strip()
+            added_sym = (ev.get("symbol") or "").strip()
+            added_name = (ev.get("addedSecurity") or "").strip()
+            removed_sym = (ev.get("removedTicker") or "").strip()
+            removed_name = (ev.get("removedSecurity") or "").strip()
+            if added_sym:
+                rows.append(
+                    {
+                        "index_name": index.lower(),
+                        "symbol": added_sym,
+                        "action": "added",
+                        "effective_date": eff,
+                        "reason": reason,
+                        "name_at_time": added_name,
+                        "fetched_at": fetched_at,
+                    }
+                )
+            if removed_sym:
+                rows.append(
+                    {
+                        "index_name": index.lower(),
+                        "symbol": removed_sym,
+                        "action": "removed",
+                        "effective_date": eff,
+                        "reason": reason,
+                        "name_at_time": removed_name,
+                        "fetched_at": fetched_at,
+                    }
+                )
+
+        if rows:
+            df_ins = pd.DataFrame(rows)
+            # Source data can carry duplicate (symbol, date, action) tuples
+            # (e.g., when a company has two share classes both removed the same
+            # day). Keep the first occurrence — the dedup must happen BEFORE
+            # the INSERT or DuckDB's primary-key constraint fires.
+            df_ins = df_ins.drop_duplicates(
+                subset=["index_name", "symbol", "effective_date", "action"], keep="first"
+            )
+            with self.cache._connect() as con:
+                con.execute(
+                    "DELETE FROM index_membership_history WHERE index_name = ?", [index.lower()]
+                )
+                con.register("df_ins", df_ins)
+                con.execute(
+                    "INSERT INTO index_membership_history "
+                    "(index_name, symbol, action, effective_date, reason, "
+                    " name_at_time, fetched_at) "
+                    "SELECT index_name, symbol, action, effective_date, reason, "
+                    " name_at_time, fetched_at FROM df_ins"
+                )
+        return self._load_membership_from_cache(index.lower())
+
+    def _load_membership_from_cache(self, index_name: str) -> pd.DataFrame:
+        with self.cache._connect() as con:
+            df = con.execute(
+                "SELECT index_name, symbol, action, effective_date, reason, "
+                "name_at_time, fetched_at FROM index_membership_history "
+                "WHERE index_name = ? ORDER BY effective_date, symbol, action",
+                [index_name],
+            ).fetchdf()
+        if not df.empty:
+            df["effective_date"] = pd.to_datetime(df["effective_date"])
+        return df
+
+    def get_constituents_at_date(
+        self,
+        index: str = "sp500",
+        as_of: pd.Timestamp | None = None,
+    ) -> list[str]:
+        """Constituents of ``index`` ON the given historical date.
+
+        Algorithm: start from the CURRENT set, then reverse-apply every event
+        with ``effective_date > as_of``:
+          - ``added`` after as_of → that ticker wasn't in the index yet → REMOVE
+          - ``removed`` after as_of → that ticker was still in the index → ADD back
+
+        Returns a sorted list of tickers.
+        """
+        current = set(self.get_index_constituents(index))
+        if as_of is None:
+            return sorted(current)
+        as_of_ts = pd.to_datetime(as_of)
+
+        events = self.get_historical_index_constituents(index)
+        if events.empty:
+            log.warning("no historical membership data for %s — returning current", index)
+            return sorted(current)
+
+        future_events = events[events["effective_date"] > as_of_ts]
+        # Process in chronological order (oldest first) so each reverse-op is on a
+        # stable membership set — this matters when the same ticker is added then
+        # removed (or vice-versa) inside the [as_of, now] window.
+        future_events = future_events.sort_values("effective_date")
+        membership = set(current)
+        # Reverse-apply: walk events from FURTHEST in the future back toward as_of
+        # so we undo them in LIFO order
+        for _, ev in future_events.sort_values("effective_date", ascending=False).iterrows():
+            if ev["action"] == "added":
+                membership.discard(ev["symbol"])
+            elif ev["action"] == "removed":
+                membership.add(ev["symbol"])
+        return sorted(membership)
 
     # Curated FTSE 100 list — the LSE screener endpoint returns generic
     # LSE listings (including penny-stock OTCs), so the static list is
     # the authoritative source. Manually maintained against the index.
     _FTSE100_STATIC = [
-        "AAL.L", "ABF.L", "AHT.L", "ANTO.L", "AV.L", "AZN.L", "BA.L", "BARC.L",
-        "BATS.L", "BDEV.L", "BEZ.L", "BKG.L", "BLND.L", "BNZL.L", "BP.L",
-        "BRBY.L", "BT-A.L", "CCH.L", "CNA.L", "CPG.L", "CRDA.L", "CRH.L",
-        "CTEC.L", "DCC.L", "DGE.L", "EDV.L", "ENT.L", "EXPN.L", "FCIT.L",
-        "FLTR.L", "FRES.L", "GLEN.L", "GSK.L", "HIK.L", "HL.L", "HLMA.L",
-        "HSBA.L", "HSX.L", "IAG.L", "ICP.L", "IHG.L", "III.L", "IMB.L",
-        "IMI.L", "INF.L", "ITRK.L", "JD.L", "KGF.L", "LAND.L", "LGEN.L",
-        "LLOY.L", "LSEG.L", "MNDI.L", "MNG.L", "MRO.L", "NG.L", "NWG.L",
-        "NXT.L", "OCDO.L", "PHNX.L", "PRU.L", "PSH.L", "PSN.L", "RIO.L",
-        "RKT.L", "RMV.L", "RR.L", "RS1.L", "RTO.L", "SBRY.L", "SDR.L",
-        "SGE.L", "SGRO.L", "SHEL.L", "SMDS.L", "SMIN.L", "SMT.L", "SN.L",
-        "SPX.L", "SSE.L", "STAN.L", "STJ.L", "SVT.L", "TSCO.L", "TW.L",
-        "ULVR.L", "UU.L", "VOD.L", "WEIR.L", "WPP.L", "WTB.L",
+        "AAL.L",
+        "ABF.L",
+        "AHT.L",
+        "ANTO.L",
+        "AV.L",
+        "AZN.L",
+        "BA.L",
+        "BARC.L",
+        "BATS.L",
+        "BDEV.L",
+        "BEZ.L",
+        "BKG.L",
+        "BLND.L",
+        "BNZL.L",
+        "BP.L",
+        "BRBY.L",
+        "BT-A.L",
+        "CCH.L",
+        "CNA.L",
+        "CPG.L",
+        "CRDA.L",
+        "CRH.L",
+        "CTEC.L",
+        "DCC.L",
+        "DGE.L",
+        "EDV.L",
+        "ENT.L",
+        "EXPN.L",
+        "FCIT.L",
+        "FLTR.L",
+        "FRES.L",
+        "GLEN.L",
+        "GSK.L",
+        "HIK.L",
+        "HL.L",
+        "HLMA.L",
+        "HSBA.L",
+        "HSX.L",
+        "IAG.L",
+        "ICP.L",
+        "IHG.L",
+        "III.L",
+        "IMB.L",
+        "IMI.L",
+        "INF.L",
+        "ITRK.L",
+        "JD.L",
+        "KGF.L",
+        "LAND.L",
+        "LGEN.L",
+        "LLOY.L",
+        "LSEG.L",
+        "MNDI.L",
+        "MNG.L",
+        "MRO.L",
+        "NG.L",
+        "NWG.L",
+        "NXT.L",
+        "OCDO.L",
+        "PHNX.L",
+        "PRU.L",
+        "PSH.L",
+        "PSN.L",
+        "RIO.L",
+        "RKT.L",
+        "RMV.L",
+        "RR.L",
+        "RS1.L",
+        "RTO.L",
+        "SBRY.L",
+        "SDR.L",
+        "SGE.L",
+        "SGRO.L",
+        "SHEL.L",
+        "SMDS.L",
+        "SMIN.L",
+        "SMT.L",
+        "SN.L",
+        "SPX.L",
+        "SSE.L",
+        "STAN.L",
+        "STJ.L",
+        "SVT.L",
+        "TSCO.L",
+        "TW.L",
+        "ULVR.L",
+        "UU.L",
+        "VOD.L",
+        "WEIR.L",
+        "WPP.L",
+        "WTB.L",
     ]
 
     def get_ftse100_constituents(self) -> list[str]:
@@ -596,8 +885,9 @@ class FMPProvider(BaseProvider):
 
     # ---- macro ---------------------------------------------------------
 
-    def get_treasury_rates(self, start: Optional[date | str] = None,
-                           end: Optional[date | str] = None) -> pd.DataFrame:
+    def get_treasury_rates(
+        self, start: Optional[date | str] = None, end: Optional[date | str] = None
+    ) -> pd.DataFrame:
         params = {}
         if start:
             params["from"] = str(start)

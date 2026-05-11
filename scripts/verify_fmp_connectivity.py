@@ -5,6 +5,7 @@
 
 Never prints the key — only masked.
 """
+
 from __future__ import annotations
 
 import os
@@ -13,13 +14,12 @@ from pathlib import Path
 
 # --- bootstrap ---
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_PARENT = _REPO_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 # ---
 
-from dotenv import load_dotenv
 import requests
+from dotenv import load_dotenv
 
 
 def mask(key: str) -> str:
@@ -64,8 +64,11 @@ def main() -> int:
     url2 = f"{base}/key-metrics-ttm?symbol=AAPL&apikey={key}"
     r2 = requests.get(url2, timeout=15)
     if r2.status_code == 403 or "Premium" in r2.text:
-        print(f"FAILED  premium endpoint blocked (HTTP {r2.status_code}). "
-              "Subscription may not be active.", file=sys.stderr)
+        print(
+            f"FAILED  premium endpoint blocked (HTTP {r2.status_code}). "
+            "Subscription may not be active.",
+            file=sys.stderr,
+        )
         print(f"        body: {r2.text[:200]}", file=sys.stderr)
         return 1
     if r2.status_code != 200:

@@ -1,8 +1,8 @@
 """BaseProvider — ABC for all data sources."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import date
 
 
 class BaseProvider(ABC):

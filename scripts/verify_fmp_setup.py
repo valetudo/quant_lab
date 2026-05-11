@@ -3,6 +3,7 @@
 Does NOT read .env directly — only loads it through dotenv and checks the
 env var. Never logs the full key — always masks first 3 + last 3 chars.
 """
+
 from __future__ import annotations
 
 import os
@@ -11,9 +12,8 @@ from pathlib import Path
 
 # --- bootstrap ---
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_PARENT = _REPO_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 # ---
 
 from dotenv import load_dotenv

@@ -1,73 +1,128 @@
-# quant_lab
+# Quant Lab
 
-Quantitative trading monorepo: strategies, backtest engine, screener, and Streamlit UI.
+A personal multi-strategy quantitative trading framework with a static strategic allocation,
+walk-forward validated strategies, a bond-ladder tracker, and a Streamlit dashboard.
+
+Single-user, manual rebalancing: the system signals drift and suggests actions; the
+user executes trades at the broker.
+
+## What it does
+
+- **Static strategic allocation** across three sleeves — bonds 50% / passive equity 30% / opportunistic 20%.
+- **Plug-and-play strategies** auto-discovered from `strategies/<id>/`. Drop a folder, restart Streamlit, it shows up.
+- **Walk-forward backtests** with survivorship-bias correction and a hard SPY benchmark gate. A strategy that beats overfit metrics but loses to buy-and-hold gets archived (see `_migration_log/V5_VS_SPY_DECISION.md`).
+- **Bond ladder tracker** for Italian government + corporate bonds with target buckets, drift alerts, and gap-fill suggestions.
+- **Streamlit dashboard** for portfolio overview, strategy listing, backtest runner, data status, bond screener, debug logs, and ladder management.
+
+## Architecture
+
+```
+            ┌──────────────────────────────────┐
+            │   Static Strategic Allocation    │   50/30/20  bonds/equity/opportunistic
+            │   (configs/portfolio.yaml)       │   drift > 5pp ⇒ UI alert
+            └────────────┬─────────────────────┘
+                         │
+       ┌─────────────────┼─────────────────────────────┐
+       ▼                 ▼                             ▼
+  ┌─────────┐     ┌────────────┐                ┌─────────────┐
+  │  Bonds  │     │   Equity   │                │ Opportunist.│
+  │  50%    │     │    30%     │                │     20%     │
+  │ ladder  │     │  passive   │                │  (cash)     │
+  │ (manual)│     │  CSPX UCITS│                │   reserved  │
+  └─────────┘     └────────────┘                └─────────────┘
+```
+
+See `docs/architecture.md` for the full picture.
 
 ## Layout
 
 ```
-core/             Framework: data, strategy ABC, backtest, analytics, IO, execution
-strategies/       Concrete strategies (bonds_income working, quality_stocks scaffold)
-portfolio/        Multi-strategy aggregation (scaffold)
-ui/               Streamlit multi-page app
-scripts/          CLI utilities (run_backtests, update_all_data, migrate_bonds_db)
-configs/          Global YAML configuration
-tests/            Cross-cutting test suite
-docs/             Architecture notes, history of archived strategies
+core/                  Framework — data, strategy ABC, backtest engine, analytics, IO, streaming
+strategies/            Concrete strategies — bonds_income, passive_equity, pattern_finder (scaffold), _archived/
+portfolio/             Sleeve model — static_allocator, state
+ui/                    Streamlit multi-page app + shared helpers
+scripts/               CLI — backtests, walk-forward, data refresh, FMP verification
+configs/               YAML — global, portfolio, per-strategy
+tests/                 Cross-cutting test suite (78 tests)
+data_storage/          Local cache root — DuckDB cache, bonds.db, positions.parquet (gitignored)
+outputs/               Backtest outputs (gitignored)
+docs/                  Architecture, per-strategy docs, archived strategies
+_migration_log/        Phase reports, decision records, audit logs (kept for traceability)
 ```
 
 ## Quick start
 
 ```bash
-# from trading_systems/quant_lab
+# from quant_lab/
 python -m venv .venv
-.venv\Scripts\activate           # Windows
+.venv\Scripts\activate           # Windows (or source .venv/bin/activate on POSIX)
 pip install -r requirements.txt
 
-# one-time: migrate the bonds.db into the configured location
+# Configure secrets:
+cp .env.example .env
+# edit .env and set FMP_API_KEY
+
+# One-time: copy bonds.db into place (if you also run the bonds scraper repo)
 python scripts/migrate_bonds_db.py
 
-# run tests
-pytest tests/ -ra
+# One-time: warm the FMP cache (~5 min, ~1700 API calls)
+python scripts/migrate_prices_to_fmp.py --start 2016-01-01 --end 2025-12-31
 
-# run a backtest from CLI
-python scripts/run_backtests.py --strategy dummy_buy_and_hold \
-    --start 2023-01-02 --end 2023-12-29
+# Run the test suite
+pytest tests/ strategies/ -ra
 
-# launch the UI
+# Launch the dashboard
 streamlit run ui/main.py
 ```
 
+Windows shortcut: double-click `start.bat` (or `start.ps1` from PowerShell).
+
 ## Configuration
 
-`configs/global.yaml` controls paths to the DuckDB store (`global_data_storage`) and the bonds SQLite DB. Override with env vars:
-- `GDS_DB_PATH` — path to the DuckDB store.
+`configs/global.yaml` holds path defaults for the DuckDB cache and the bonds SQLite DB.
+Env vars override (see `.env.example`):
+
+| Env var | Purpose |
+|---|---|
+| `FMP_API_KEY` | **Required.** Financial Modeling Prep Premium API key. |
+| `QUANT_LAB_DATA_PATH` | Optional. Override data_storage root. |
+| `QUANT_LAB_BONDS_DB_PATH` | Optional. Override path to `bonds.db`. |
+| `GDS_DB_PATH` | Optional. Override path to the global DuckDB. |
+
+`configs/portfolio.yaml` declares the sleeve model — edit `total_capital_eur` and
+`strategic_allocation` to match your situation. Drift alert threshold is
+`drift_threshold_pp` (default 5.0).
 
 ## Strategies
 
-| Strategy | Status | Description |
-|----------|--------|-------------|
-| `bonds_income` | working (MVP) | Monthly-rebalanced buy-and-hold sovereign bond income |
-| `quality_stocks` | scaffold | Quantopian-style quality factor (Phase 2) |
-| `dummy_buy_and_hold` | reference | "Hello World" template (in `strategies/_examples/`) |
+| Strategy | Sleeve | Status | Notes |
+|---|---|---|---|
+| `bonds_income` | bonds 50% | active | Manual ladder tracker, target buckets, drift alerts. |
+| `passive_equity` | equity 30% | active | Buy-once-hold-forever CSPX.L UCITS ETF (SPY proxy fallback). |
+| `pattern_finder` | opportunistic 20% | scaffold | Adapter for an external pattern-mining repo. Not yet wired. |
+| `quality_stocks` V5 | (archived) | archived | Reached STRONGLY ROBUST 8/8 in WF but lost -4.6 pp/yr to SPY → archived. See `_migration_log/V5_VS_SPY_DECISION.md`. |
 
 ## Adding a strategy
 
-Subclass `quant_lab.core.strategy.base.Strategy`. See `docs/adding_a_strategy.md` for the walkthrough. The reference implementation lives in `strategies/_examples/dummy_buy_and_hold.py`.
+1. Create `strategies/<id>/` containing `strategy.py` (subclass `core.strategy.base.Strategy`) and `config.yaml`.
+2. Restart Streamlit. The registry auto-discovers it; the Strategies page lists it under its sleeve.
 
-## Git remote
+The reference implementation lives in `strategies/_examples/dummy_buy_and_hold.py`.
+Full walkthrough in `docs/adding_a_strategy.md`.
 
-This repository is initialized locally. To push to a remote:
+## Phase history
 
-```bash
-git remote add origin <url>
-git push -u origin main
-```
-
-## History
-
-- **Phase 1** (2026-05): monorepo scaffolding from `pair_trading_ITA` + `bonds`.
-- See `docs/archived_strategies.md` for the project history and reasons behind archiving `pair_trading_ITA`.
+| Phase | Focus | Report |
+|---|---|---|
+| Phase 1 | Monorepo scaffolding from pair_trading_ITA + bonds | `_migration_log/PHASE1_REPORT.md` |
+| Phase 2 | FMP provider, Quality Stocks baseline, Master Allocator | `_migration_log/PHASE2_REPORT.md` |
+| Phase 2.5 | Bonds Screener filters, Live equity streaming | `_migration_log/PHASE2_5_REPORT.md` |
+| Phase 3 | Static allocation, Portfolio Overview, Quality Stocks V5 | `_migration_log/PHASE3_REPORT.md` |
+| Quality Stocks V5 | Full-history walk-forward + survivorship correction | `_migration_log/V5_FULL_VALIDATION_REPORT.md`, `_migration_log/V5_SURVIVORSHIP_VALIDATION_REPORT.md` |
+| V5 vs SPY decision | Benchmark gate fail → archive V5, flip equity sleeve to passive CSPX | `_migration_log/V5_VS_SPY_DECISION.md` |
+| Phase 4 | Restructure to 50/30/20, modular strategy registry, passive equity sleeve | (see `CHANGELOG.md`) |
+| Pre-v1.0.0 | Code cleanup, security audit, git init | `_migration_log/cleanup_inventory.md`, `_migration_log/SECURITY_AUDIT.md` |
 
 ## License
 
-MIT.
+MIT — see `LICENSE`.

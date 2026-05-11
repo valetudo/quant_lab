@@ -17,6 +17,7 @@ Important caveats:
     backtest of the strategy itself, BTP price history must be loaded
     (Phase 2 task).
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,10 +27,10 @@ from typing import Optional
 import pandas as pd
 import yaml
 
-from quant_lab.core.strategy.base import Strategy
-from quant_lab.core.strategy.signals import Action, Position, Signal
-from quant_lab.core.strategy.lifecycle import is_first_of_month
-from quant_lab.strategies.bonds_income.selection import enrich_and_select
+from core.strategy.base import Strategy
+from core.strategy.lifecycle import is_first_of_month
+from core.strategy.signals import Action, Position, Signal
+from strategies.bonds_income.selection import enrich_and_select
 
 log = logging.getLogger(__name__)
 
@@ -152,20 +153,22 @@ class BondsIncome(Strategy):
                 continue
             if not pd.notna(history[b["isin"]].iloc[-1]):
                 continue
-            signals.append(Signal(
-                strategy_id=self._strategy_id,
-                instruments=[b["isin"]],
-                sides=["long"],
-                target_sizes_eur=[per_leg],
-                metadata=dict(
-                    name=b.get("name"),
-                    net_yield_pct=b.get("net_yield_pa"),
-                    years_to_maturity=b.get("years_to_maturity"),
-                    nation=b.get("sovereign_nation"),
-                    issuer_type=b.get("issuer_type"),
-                    rebalance_date=str(date.date()) if hasattr(date, "date") else str(date),
-                ),
-            ))
+            signals.append(
+                Signal(
+                    strategy_id=self._strategy_id,
+                    instruments=[b["isin"]],
+                    sides=["long"],
+                    target_sizes_eur=[per_leg],
+                    metadata=dict(
+                        name=b.get("name"),
+                        net_yield_pct=b.get("net_yield_pa"),
+                        years_to_maturity=b.get("years_to_maturity"),
+                        nation=b.get("sovereign_nation"),
+                        issuer_type=b.get("issuer_type"),
+                        rebalance_date=str(date.date()) if hasattr(date, "date") else str(date),
+                    ),
+                )
+            )
         return signals
 
     def manage_positions(
@@ -185,9 +188,11 @@ class BondsIncome(Strategy):
             if pos.strategy_id != self._strategy_id:
                 continue
             if pos.instruments and pos.instruments[0] not in new_isins:
-                actions.append(Action(
-                    position_id=pos.position_id,
-                    action="close",
-                    reason="rebalance_drop",
-                ))
+                actions.append(
+                    Action(
+                        position_id=pos.position_id,
+                        action="close",
+                        reason="rebalance_drop",
+                    )
+                )
         return actions

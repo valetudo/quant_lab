@@ -1,0 +1,36 @@
+# Default behaviour: auto-detect text, normalise line endings on commit.
+* text=auto eol=lf
+
+# Source: always LF.
+*.py     text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.toml   text eol=lf
+*.md     text eol=lf
+*.json   text eol=lf
+*.txt    text eol=lf
+*.cfg    text eol=lf
+*.ini    text eol=lf
+
+# Windows-specific tooling (leave native CRLF).
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+*.ps1    text eol=crlf
+
+# Binary blobs: never diff or merge.
+*.parquet binary
+*.duckdb  binary
+*.db      binary
+*.sqlite  binary
+*.sqlite3 binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.pdf     binary
+
+# Linguist hints — don't count migration logs / archived code in language stats.
+_migration_log/* linguist-documentation
+strategies/_archived/* linguist-vendored
+scripts/_archived/* linguist-vendored

@@ -1,11 +1,12 @@
 """End-to-end integration: BondsIncome on a synthetic bond panel."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
-from quant_lab.core.backtest.engine import PortfolioBacktester
-from quant_lab.strategies.bonds_income import BondsIncome
+from core.backtest.engine import PortfolioBacktester
+from strategies.bonds_income import BondsIncome
 
 
 def _mock_bond_snapshot():
@@ -56,8 +57,9 @@ def _bond_panel():
 def test_bonds_income_runs_end_to_end():
     panel = _bond_panel()
     strat = BondsIncome(bond_snapshot=_mock_bond_snapshot(), initial_capital_eur=50_000)
-    bt = PortfolioBacktester(strat, panel, initial_capital_eur=50_000,
-                             commission_bps=5, slippage_bps=5)
+    bt = PortfolioBacktester(
+        strat, panel, initial_capital_eur=50_000, commission_bps=5, slippage_bps=5
+    )
     res = bt.run()
     assert not res.equity.empty
     # At minimum the first month should generate some trades — but the

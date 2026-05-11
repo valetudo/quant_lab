@@ -1,9 +1,11 @@
 """Data validation schemas. Uses pandera if installed; falls back to runtime checks otherwise."""
+
 from __future__ import annotations
 
 try:
     import pandera as pa
     from pandera.typing import Series
+
     PANDERA_AVAILABLE = True
 except ImportError:
     PANDERA_AVAILABLE = False

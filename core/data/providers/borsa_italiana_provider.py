@@ -10,17 +10,17 @@ overridden via constructor. Default for development: the same DB the
 original bonds project used. Migration to global_data_storage/bonds/
 is performed by `scripts/migrate_bonds_db.py`.
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional, Iterable
 
 import pandas as pd
 
-from quant_lab.core.data.providers.base import BaseProvider
-from quant_lab.core.data.providers._bonds_impl.database import Database
-from quant_lab.core.data.providers._bonds_impl import calculations as _calc
+from core.data.providers._bonds_impl import calculations as _calc
+from core.data.providers._bonds_impl.database import Database
+from core.data.providers.base import BaseProvider
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class BorsaItalianaProvider(BaseProvider):
         Uses the default SCRAPE_PROFILES from the bonds scraper module.
         """
         try:
-            from quant_lab.core.data.providers._bonds_impl.scraper import run_scrape
+            from core.data.providers._bonds_impl.scraper import run_scrape
         except ImportError as e:
             return {"status": "error", "message": f"scraping deps not available: {e}"}
         try:

@@ -3,7 +3,9 @@
 Migrated and generalized from pair_trading_ITA._leg_cost. The interface
 is per-leg (single instrument); the engine sums across legs of a signal.
 """
+
 from __future__ import annotations
+
 from typing import Optional
 
 
@@ -31,6 +33,6 @@ def leg_cost(
         adv = avg_daily_turnover_eur.get(ticker)
         if adv and adv > 0 and notional > 0:
             ratio = notional / adv
-            extra = notional * (slippage_bps / 1e4) * sqrt_impact_kappa * (ratio ** 0.5)
+            extra = notional * (slippage_bps / 1e4) * sqrt_impact_kappa * (ratio**0.5)
             base += extra
     return float(base)

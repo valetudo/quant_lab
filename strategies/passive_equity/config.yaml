@@ -1,0 +1,31 @@
+strategy_id: passive_equity
+description: "Passive S&P 500 exposure via CSPX UCITS ETF (Italian retail-accessible)"
+status: active
+
+# Primary ETF — preferred for European/Italian retail investors
+symbol: CSPX.L          # iShares Core S&P 500 UCITS ETF (London listing)
+# Alternative options documented for reference:
+#  - VUAA.L   Vanguard S&P 500 UCITS (accumulating, TER 0.07 %)
+#  - SPY5.L   SPDR S&P 500 UCITS (distributing, TER 0.03 %)
+#  - CSPX.MI  Same CSPX, Borsa Italiana listing
+
+# Capital allocated (overridden by portfolio.yaml * sleeve weight)
+capital_eur: 30000      # 30 % of €100k total portfolio
+
+# No rebalancing — pure buy-and-hold
+rebalance_frequency: never
+
+# Costs (entry only, no exit unless portfolio liquidation)
+commission_bps: 5
+slippage_bps: 5
+
+notes: |
+  Phase 4 equity sleeve: passive replacement for Quality Stocks V5
+  (archived after underperforming SPY by −4.6 %/yr in 13-y OOS).
+  CSPX is preferred for IT-retail investors because:
+    - UCITS-compliant (PRIIPs KID in Italian)
+    - Ireland-domiciled (favourable US dividend withholding)
+    - Accumulating (no distribution complications)
+    - TER 0.07 %  (competitive)
+    - Dual-listed: CSPX.MI (Milan) and CSPX.L (London)
+  Backtest uses SPY as a proxy when CSPX is not in the local price cache.

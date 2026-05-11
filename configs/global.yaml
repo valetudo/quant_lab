@@ -1,14 +1,21 @@
 # Global configuration for quant_lab.
 # Paths use forward slashes (Windows-friendly via pathlib).
+#
+# All path fields here can be overridden by environment variables (see .env.example):
+#   QUANT_LAB_DATA_PATH       overrides data_storage_path
+#   QUANT_LAB_BONDS_DB_PATH   overrides bonds_db_path
+#   GDS_DB_PATH               overrides duckdb_path
+#
+# Default behaviour when ALL fields are null:
+#   data_storage_path → <repo>/data_storage
+#   bonds_db_path     → <data_storage_path>/bonds/bonds.db
+#   duckdb_path       → ~/.global_data_storage/store.duckdb
+#
+# These defaults make the repo work on a fresh clone without edits.
 
-data_storage_path: "G:/Il mio Drive/__NUOVA_STRUTTURA_DOCUMENTI/02_FINANZE/trading_systems/global_data_storage"
-
-# Where the GDS DuckDB store lives. Override via env GDS_DB_PATH.
-# Default: ~/.global_data_storage/store.duckdb
-duckdb_path: null
-
-# Where the bonds SQLite database lives after migration.
-bonds_db_path: "G:/Il mio Drive/__NUOVA_STRUTTURA_DOCUMENTI/02_FINANZE/trading_systems/global_data_storage/bonds/bonds.db"
+data_storage_path: null   # null → <repo>/data_storage. Override via env QUANT_LAB_DATA_PATH.
+duckdb_path: null         # null → ~/.global_data_storage/store.duckdb. Override via env GDS_DB_PATH.
+bonds_db_path: null       # null → <data_storage_path>/bonds/bonds.db. Override via env QUANT_LAB_BONDS_DB_PATH.
 
 default_currency: "EUR"
 initial_capital_eur: 50000

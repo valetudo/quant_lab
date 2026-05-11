@@ -1,0 +1,45 @@
+# Quality Stocks parameters — variant V2: faster trend filter.
+# Hypothesis: SPY SMA(50/200) reacts too slowly to the post-2020 regime
+# whip; SMA(20/100) catches inflection earlier and may improve OOS Sharpe.
+# Everything else identical to baseline.
+
+strategy_id: quality_stocks_v2
+universe: sp500_ex_financials
+
+# Selection
+target_securities: 20
+quality_pool: 50
+momentum_lookback: 126
+momentum_skip: 10
+
+# Trend filter — FASTER
+trend_short_ma: 20
+trend_long_ma: 100
+trend_reference: SPY
+
+# Bond fallback
+bond_fallback: IEF
+
+# Quality score weights
+quality_weights:
+  roic: 1.0
+  fcf_yield: 1.0
+  cash_return: 1.0
+  inv_debt_eq: 1.0
+  stable_roic: 1.0
+
+# Sizing
+capital_per_position_eur: 5000
+initial_capital_eur: 100000
+
+# Rebalancing
+rebalance_frequency: monthly
+
+# Sectors to exclude
+exclude_sectors:
+  - "Financial Services"
+
+# Costs
+commission_bps: 5
+slippage_bps: 5
+slippage_model: linear_bps

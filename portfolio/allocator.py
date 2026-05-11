@@ -1,7 +1,10 @@
 """Capital allocator across strategies. Scaffold for Phase 2."""
+
 from __future__ import annotations
-import yaml
+
 from pathlib import Path
+
+import yaml
 
 
 def load_allocation(path: str | Path) -> dict[str, float]:

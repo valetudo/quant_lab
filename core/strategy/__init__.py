@@ -1,6 +1,6 @@
 """Strategy abstractions: ABC, Signal/Action/Position dataclasses, lifecycle helpers."""
 
-from quant_lab.core.strategy.base import Strategy
-from quant_lab.core.strategy.signals import Signal, Action, Position
+from core.strategy.base import Strategy
+from core.strategy.signals import Action, Position, Signal
 
 __all__ = ["Strategy", "Signal", "Action", "Position"]

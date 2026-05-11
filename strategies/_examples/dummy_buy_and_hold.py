@@ -4,12 +4,13 @@ Buys a fixed list of tickers on the first bar with equal weight, holds to
 the end, never sells. Used as the "Hello World" of the framework and as
 fixture for engine smoke-tests.
 """
+
 from __future__ import annotations
 
 import pandas as pd
 
-from quant_lab.core.strategy.base import Strategy
-from quant_lab.core.strategy.signals import Action, Position, Signal
+from core.strategy.base import Strategy
+from core.strategy.signals import Action, Position, Signal
 
 
 class DummyBuyAndHold(Strategy):
@@ -43,8 +44,9 @@ class DummyBuyAndHold(Strategy):
     ) -> list[Signal]:
         if self._bought:
             return []
-        avail = [t for t in self._tickers if t in history.columns
-                 and pd.notna(history[t].loc[date])]
+        avail = [
+            t for t in self._tickers if t in history.columns and pd.notna(history[t].loc[date])
+        ]
         if not avail:
             return []
         per_leg = self._initial_capital_eur / len(avail)

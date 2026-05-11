@@ -6,6 +6,7 @@ For bonds: SQLite at <data_storage_path>/bonds/bonds.db (Borsa Italiana scrape).
 Configuration comes from `configs/global.yaml` (default path) or via the
 GDS_DB_PATH / bonds_db_path env vars.
 """
+
 from __future__ import annotations
 
 import logging
@@ -13,7 +14,7 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import ClassVar, Optional, Sequence
 
 import pandas as pd
 import yaml
@@ -51,12 +52,20 @@ class DataStorage:
     @classmethod
     def from_config(cls, cfg: dict | None = None) -> "DataStorage":
         cfg = cfg or load_global_config()
+        # Environment variables take precedence over YAML — this lets a user
+        # check out the repo on a fresh machine without editing configs/.
+        env_data = os.environ.get("QUANT_LAB_DATA_PATH")
+        env_bonds = os.environ.get("QUANT_LAB_BONDS_DB_PATH")
+        data_storage_path = Path(
+            env_data or cfg.get("data_storage_path") or (_project_root() / "data_storage")
+        )
+        bonds_db_path = Path(
+            env_bonds or cfg.get("bonds_db_path") or (data_storage_path / "bonds" / "bonds.db")
+        )
         return cls(
             duckdb_path=_default_duckdb_path(cfg),
-            bonds_db_path=Path(cfg.get("bonds_db_path") or
-                               (_project_root() / "data_storage" / "bonds" / "bonds.db")),
-            data_storage_path=Path(cfg.get("data_storage_path") or
-                                    (_project_root() / "data_storage")),
+            bonds_db_path=bonds_db_path,
+            data_storage_path=data_storage_path,
         )
 
     # ---- equity price panel (DuckDB) -------------------------------------
@@ -79,6 +88,7 @@ class DataStorage:
             return pd.DataFrame()
 
         import duckdb  # local import so the bonds-only path doesn't require it
+
         placeholders = ",".join("?" for _ in tickers)
         sql = f"""
             SELECT date, ticker, {field} AS value
@@ -104,6 +114,7 @@ class DataStorage:
         if not self.duckdb_path.exists():
             return pd.DataFrame()
         import duckdb
+
         with duckdb.connect(str(self.duckdb_path), read_only=True) as con:
             try:
                 df = con.execute(
@@ -123,6 +134,7 @@ class DataStorage:
         if not self.duckdb_path.exists():
             return []
         import duckdb
+
         with duckdb.connect(str(self.duckdb_path), read_only=True) as con:
             try:
                 df = con.execute(
@@ -196,8 +208,9 @@ class DataStorage:
         Otherwise, searches all universes for a matching parquet file.
         """
         candidates = (
-            [self._universe_dir(universe)] if universe else
-            [self._universe_dir(u) for u in self.list_universes()]
+            [self._universe_dir(universe)]
+            if universe
+            else [self._universe_dir(u) for u in self.list_universes()]
         )
         safe = self._safe_symbol(symbol)
         for d in candidates:
@@ -234,3 +247,43 @@ class DataStorage:
         out = pd.concat(frames, axis=1)
         out.columns.name = "symbol"
         return out
+
+    # ---- retail-proxy fallback (Phase 4) -------------------------------
+
+    # Retail UCITS ETFs that aren't in the FMP cache map to a closely-correlated
+    # US-listed proxy so backtests still produce a usable price series. Used
+    # by ``get_prices_with_proxy``. The end-user still BUYS the configured
+    # retail ETF; this is purely a backtest-data fallback.
+    # ClassVar — this is a class-level constant, NOT a dataclass field.
+    RETAIL_PROXIES: ClassVar[dict[str, str]] = {
+        "CSPX.L": "SPY",
+        "CSPX.MI": "SPY",
+        "VUAA.L": "SPY",
+        "SPY5.L": "SPY",
+    }
+
+    def get_prices_with_proxy(
+        self,
+        symbol: str,
+        start: date | str | None = None,
+        end: date | str | None = None,
+        *,
+        universe: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Like :meth:`get_prices`, but falls back to a US-listed proxy from
+        ``RETAIL_PROXIES`` when ``symbol`` has no parquet on disk. Returns
+        the proxy's data with an attribute ``df.attrs['proxy_for']`` set so
+        callers can detect the substitution.
+        """
+        df = self.get_prices(symbol, start, end, universe=universe)
+        if not df.empty:
+            return df
+        proxy = self.RETAIL_PROXIES.get(symbol)
+        if not proxy:
+            return df
+        pdf = self.get_prices(proxy, start, end, universe=universe)
+        if not pdf.empty:
+            pdf = pdf.copy()
+            pdf.attrs["proxy_for"] = symbol
+            pdf.attrs["proxy_symbol"] = proxy
+        return pdf

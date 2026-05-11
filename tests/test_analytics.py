@@ -1,4 +1,5 @@
 """Analytics — metrics on synthetic equity / trades."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,9 +7,11 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from quant_lab.core.analytics.metrics import (
-    annualised_vol, calmar, cagr, compute_metrics, max_drawdown, sharpe,
-    sortino, trade_stats,
+from core.analytics.metrics import (
+    compute_metrics,
+    max_drawdown,
+    sharpe,
+    trade_stats,
 )
 
 
@@ -36,8 +39,7 @@ def test_sharpe_on_known_series():
 
 
 def test_drawdown_on_synthetic_dip():
-    eq = pd.Series([100, 110, 120, 90, 95, 100],
-                   index=pd.date_range("2024-01-01", periods=6))
+    eq = pd.Series([100, 110, 120, 90, 95, 100], index=pd.date_range("2024-01-01", periods=6))
     mdd, peak, trough = max_drawdown(eq)
     assert mdd == pytest_approx(-0.25)
     assert peak == eq.index[2]
@@ -57,4 +59,5 @@ def pytest_approx(value, tol=1e-9):
     class _Approx:
         def __eq__(self, other):
             return abs(other - value) <= max(tol, tol * abs(value))
+
     return _Approx()

@@ -1,48 +1,69 @@
-# Backups and migration artefacts
-_backups/
-_migration_log/
-
-# Secrets / FMP cache
+# ---------- Secrets ----------
 .env
-data_storage/cache/
+.env.local
+.env.*.local
+secrets.yaml
+.streamlit/secrets.toml
+*.key
+*.pem
 
-# Python
+# ---------- Python ----------
 __pycache__/
-.env
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ---------- Virtual envs ----------
 .venv/
 venv/
-*.egg-info/
+env/
+ENV/
+
+# ---------- Tooling caches ----------
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
 
-# Data and binaries
-data_storage/
+# ---------- Local data ----------
+# Heavy parquet/duckdb caches are user-local — regenerated on first run.
+data_storage/cache/
+data_storage/prices/
+data_storage/fundamentals/
+data_storage/etf/
+data_storage/bonds/positions.parquet
+data_storage/bonds/positions.csv
+data_storage/portfolio/rebalance_log.jsonl
 *.duckdb
-*.parquet
-*.db
+*.duckdb.wal
 *.sqlite
 *.sqlite3
 
-# Outputs and logs
+# Outputs / logs (regenerable from backtests + scripts)
 outputs/
 logs/
 
-# Secrets and local config
-.env
-secrets.yaml
-.streamlit/secrets.toml
-
-# IDE
+# ---------- IDE / OS ----------
 .vscode/
 .idea/
 *.swp
+*~
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Coverage
-.coverage
-htmlcov/
+# ---------- Backups & scratch ----------
+_backups/
+
+# ---------- Migration log: keep reports, ignore scratch ----------
+_migration_log/*.log
+_migration_log/_phase*.py
+_migration_log/_*.txt

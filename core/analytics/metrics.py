@@ -4,6 +4,7 @@ Migrated and generalized from pair_trading_ITA. The trade-stats branch
 reads from generic Trade objects (any object with `.net_pnl` and
 `.duration_days`), not pair-specific TradeRecord.
 """
+
 from __future__ import annotations
 
 from typing import Iterable
@@ -20,7 +21,9 @@ def cagr(equity: pd.Series, trading_days: int = 252) -> float:
     if len(equity) < 2 or equity.iloc[0] <= 0:
         return float("nan")
     years = len(equity) / trading_days
-    return float((equity.iloc[-1] / equity.iloc[0]) ** (1 / years) - 1) if years > 0 else float("nan")
+    return (
+        float((equity.iloc[-1] / equity.iloc[0]) ** (1 / years) - 1) if years > 0 else float("nan")
+    )
 
 
 def annualised_vol(returns: pd.Series, trading_days: int = 252) -> float:
@@ -70,10 +73,16 @@ def calmar(equity: pd.Series, trading_days: int = 252) -> float:
 def trade_stats(trades: Iterable) -> dict:
     rows = list(trades)
     if not rows:
-        return dict(n_trades=0, hit_rate=float("nan"), profit_factor=float("nan"),
-                    avg_pnl=float("nan"), median_pnl=float("nan"),
-                    avg_winner=float("nan"), avg_loser=float("nan"),
-                    avg_duration=float("nan"))
+        return dict(
+            n_trades=0,
+            hit_rate=float("nan"),
+            profit_factor=float("nan"),
+            avg_pnl=float("nan"),
+            median_pnl=float("nan"),
+            avg_winner=float("nan"),
+            avg_loser=float("nan"),
+            avg_duration=float("nan"),
+        )
     pnls = np.array([float(t.net_pnl) for t in rows])
     wins = pnls[pnls > 0]
     losses = pnls[pnls < 0]
@@ -118,7 +127,9 @@ def compute_metrics(
         calmar=calmar(eq, trading_days),
         max_drawdown=mdd,
         max_dd_peak=peak.date().isoformat() if peak is not None and hasattr(peak, "date") else None,
-        max_dd_trough=trough.date().isoformat() if trough is not None and hasattr(trough, "date") else None,
+        max_dd_trough=trough.date().isoformat()
+        if trough is not None and hasattr(trough, "date")
+        else None,
     )
     out.update(trade_stats(trades))
     if open_count is not None and not open_count.empty:

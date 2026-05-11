@@ -3,22 +3,23 @@
 Run:
     streamlit run ui/main.py
 """
+
 from __future__ import annotations
 
 # --- sys.path bootstrap ---
-# Streamlit launches pages without going through pip install, so we
-# insert the project root's parent so `import quant_lab.*` resolves.
+# Streamlit launches pages without going through pip install, so we insert
+# the project root so `from core...`, `from strategies...` etc. resolve.
 import sys
 from pathlib import Path
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_PARENT = _PROJECT_ROOT.parent
-if str(_PARENT) not in sys.path:
-    sys.path.insert(0, str(_PARENT))
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 # --- end bootstrap ---
 
 import streamlit as st
 
-from quant_lab.core.data.storage import DataStorage, load_global_config
+from core.data.storage import DataStorage, load_global_config
 
 
 def main() -> None:
@@ -37,13 +38,17 @@ def main() -> None:
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("DuckDB store",
-                  "present" if storage.duckdb_path.exists() else "missing",
-                  str(storage.duckdb_path))
+        st.metric(
+            "DuckDB store",
+            "present" if storage.duckdb_path.exists() else "missing",
+            str(storage.duckdb_path),
+        )
     with col2:
-        st.metric("Bonds DB",
-                  "present" if storage.bonds_db_exists() else "missing",
-                  str(storage.bonds_db_path))
+        st.metric(
+            "Bonds DB",
+            "present" if storage.bonds_db_exists() else "missing",
+            str(storage.bonds_db_path),
+        )
     with col3:
         st.metric("Capital (EUR)", f"{cfg.get('initial_capital_eur', 50000):,}")
 
