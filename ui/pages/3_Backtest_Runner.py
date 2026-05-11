@@ -142,9 +142,11 @@ def _make_strategy(strat_id: str, tickers: list[str], capital: float):
     if strat_id == "passive_equity":
         from strategies.passive_equity import PassiveEquity
 
-        # Phase 4: equity sleeve flipped from active V5 to passive CSPX
-        # (see _migration_log/V5_VS_SPY_DECISION.md).
-        return PassiveEquity(symbol="CSPX.L", initial_capital_eur=capital)
+        # v1.1.0: equity sleeve uses VWCE (global FTSE All-World).
+        # Pre-v1.1.0 was CSPX (S&P 500). See
+        # _migration_log/EQUITY_SLEEVE_GLOBAL_DECISION.md and
+        # _migration_log/V5_VS_SPY_DECISION.md.
+        return PassiveEquity(symbol="VWCE.MI", initial_capital_eur=capital)
     raise ValueError(strat_id)
 
 
@@ -163,8 +165,9 @@ def _build_panel_for_strategy(
             return pd.DataFrame()
         return pd.DataFrame(100.0, index=idx, columns=isins)
     if strat_id == "passive_equity":
-        # Try CSPX first, fall back to SPY proxy if CSPX not in local cache.
-        return _build_panel(["CSPX.L", "SPY"], start, end)
+        # Try VWCE first, fall back to VT (US-listed FTSE All-World proxy).
+        # CSPX/SPY also included for backward compatibility with pre-v1.1.0 backtests.
+        return _build_panel(["VWCE.MI", "VT", "CSPX.L", "SPY"], start, end)
     return _build_panel(tickers, start, end)
 
 

@@ -99,8 +99,8 @@ def test_no_signal_when_neither_symbol_nor_proxy_available():
 
 def test_default_config_loaded_when_no_kwargs(tmp_path, monkeypatch):
     s = PassiveEquity()
-    # Default config.yaml carries CSPX.L
-    assert s.universe == ["CSPX.L"]
+    # Default config.yaml carries VWCE.MI (v1.1.0+)
+    assert s.universe == ["VWCE.MI"]
     assert s._initial_capital_eur == 30_000.0
     assert s.strategy_id == "passive_equity"
 

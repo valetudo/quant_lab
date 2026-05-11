@@ -256,10 +256,22 @@ class DataStorage:
     # retail ETF; this is purely a backtest-data fallback.
     # ClassVar — this is a class-level constant, NOT a dataclass field.
     RETAIL_PROXIES: ClassVar[dict[str, str]] = {
+        # S&P 500 UCITS variants → SPY proxy for backtest
         "CSPX.L": "SPY",
         "CSPX.MI": "SPY",
         "VUAA.L": "SPY",
         "SPY5.L": "SPY",
+        # Global / All-World UCITS variants → VT (Vanguard Total World) proxy.
+        # VT is the US-listed equivalent of VWCE — same FTSE All-World index.
+        "VWCE.MI": "VT",
+        "VWCE.L": "VT",
+        "VWCE.DE": "VT",
+        "VWCE.AS": "VT",
+        "VWRL.L": "VT",  # distributing version
+        # MSCI World UCITS (developed only) → URTH (iShares MSCI World, US-listed)
+        "IWDA.AS": "URTH",
+        "SWDA.L": "URTH",
+        "EUNL.DE": "URTH",
     }
 
     def get_prices_with_proxy(

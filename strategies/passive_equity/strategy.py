@@ -13,10 +13,11 @@ This is technically a Strategy (subclasses ``core.strategy.Strategy``) so
 the portfolio framework can track it uniformly with the active strategies,
 but it generates exactly one signal in its lifetime.
 
-Default symbol is ``CSPX.L`` (iShares Core S&P 500 UCITS ETF). For
-backtesting on price tables that do not carry CSPX, ``SPY`` is a 99 %+
-correlated US-listed proxy — wired as a fallback in
-``DataStorage.get_prices_with_proxy``.
+Default symbol (v1.1.0+) is ``VWCE.MI`` (Vanguard FTSE All-World UCITS
+ETF, ISIN IE00BK5BQT80). For backtesting on price tables that do not
+carry VWCE — it only listed in 2019 — ``VT`` is the US-listed equivalent
+proxy. Pre-v1.1.0 used CSPX.L (S&P 500), which falls back to SPY.
+The full proxy table lives in ``DataStorage.RETAIL_PROXIES``.
 """
 
 from __future__ import annotations
@@ -54,7 +55,7 @@ class PassiveEquity(Strategy):
         cfg = _load_config(config_path)
         self._strategy_id = strategy_id
         # Explicit kwargs win over config-file defaults
-        self._symbol = symbol or cfg.get("symbol", "CSPX.L")
+        self._symbol = symbol or cfg.get("symbol", "VWCE.MI")
         self._initial_capital_eur = float(
             initial_capital_eur
             if initial_capital_eur is not None
@@ -88,10 +89,21 @@ class PassiveEquity(Strategy):
         # Hard-coded retail proxies mirror DataStorage.RETAIL_PROXIES, kept
         # here so the strategy is independent of the storage helper.
         proxies = {
+            # S&P 500 UCITS → SPY
             "CSPX.L": "SPY",
             "CSPX.MI": "SPY",
             "VUAA.L": "SPY",
             "SPY5.L": "SPY",
+            # FTSE All-World UCITS → VT (Vanguard Total World)
+            "VWCE.MI": "VT",
+            "VWCE.L": "VT",
+            "VWCE.DE": "VT",
+            "VWCE.AS": "VT",
+            "VWRL.L": "VT",
+            # MSCI World UCITS (developed only) → URTH
+            "IWDA.AS": "URTH",
+            "SWDA.L": "URTH",
+            "EUNL.DE": "URTH",
         }
         fallback = proxies.get(self._symbol)
         if fallback and fallback in history.columns:

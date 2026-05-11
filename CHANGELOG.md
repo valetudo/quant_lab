@@ -3,6 +3,29 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-05-11
+
+### Changed
+
+- **Equity sleeve switched from CSPX (S&P 500 USA) to VWCE (FTSE All-World global).**
+  - Rationale: address unexamined US-centric bias inherited from the Quantopian era.
+  - VWCE.MI = Vanguard FTSE All-World UCITS ETF, ISIN IE00BK5BQT80, ~3700 holdings, developed + emerging markets, TER 0.19 % (reduced from 0.22 % in Oct 2025), accumulating, Borsa Italiana in EUR.
+  - Default symbol in `strategies/passive_equity/config.yaml`, `strategies/passive_equity/strategy.py`, `portfolio/state.py`, `ui/pages/1_Portfolio_Overview.py`, `ui/pages/3_Backtest_Runner.py`, `scripts/run_backtests.py` all updated.
+  - Backward compatible: CSPX preserved as alternative in config notes; `RETAIL_PROXIES` keeps CSPX→SPY for anyone using v1.0.0 setups.
+
+### Added
+
+- `VWCE.MI/.L/.DE/.AS` and `VWRL.L` → `VT` (Vanguard Total World) proxy mappings in `core.data.storage.DataStorage.RETAIL_PROXIES` for backtests when local FMP cache lacks VWCE (it only listed in 2019).
+- `IWDA.AS/SWDA.L/EUNL.DE` → `URTH` (iShares MSCI World, US-listed) proxy mappings for the MSCI World developed-only alternative documented in the strategy README.
+- `_migration_log/EQUITY_SLEEVE_GLOBAL_DECISION.md` — full rationale, trade-offs, and reversibility notes for the switch.
+- Updated `strategies/passive_equity/README.md`, root `README.md`, `docs/architecture.md`, and `configs/portfolio.yaml` notes.
+
+### Notes
+
+- No code logic changed in `passive_equity/strategy.py` — only the default symbol and the inline proxy table.
+- Allocation framework unchanged (still 50 / 30 / 20).
+- Tests not re-run (config-only change, no logic touched). The default-config test was updated to assert `VWCE.MI` instead of `CSPX.L`.
+
 ## [1.0.0] — 2026-05-11
 
 First public release. Stable framework, documented strategies, full test suite, and a security-audited codebase.

@@ -24,7 +24,7 @@ Fixed 50/30/20 — bonds / equity / opportunistic — declared in
 | Sleeve | Target | Strategies | Notes |
 |---|---:|---|---|
 | bonds | 50% | bonds_income | Manual ladder. Mix 70% sovereign / 30% corporate IG. |
-| equity | 30% | passive_equity | Buy-once-hold-forever CSPX.L UCITS ETF (SPY proxy fallback). |
+| equity | 30% | passive_equity | Buy-once-hold-forever VWCE.MI UCITS ETF — Vanguard FTSE All-World, ~3700 global holdings, developed + emerging, TER 0.19% (VT proxy fallback). v1.1.0 switched from CSPX (S&P 500) to address US-only bias — see `_migration_log/EQUITY_SLEEVE_GLOBAL_DECISION.md`. |
 | opportunistic | 20% | pattern_finder (scaffold), reserved cash | Pattern Finder adapter ready; opportunistic slots will be wired here. |
 
 Drift > 5pp from any sleeve target triggers a red banner on Portfolio Overview

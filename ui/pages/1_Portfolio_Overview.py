@@ -2,7 +2,7 @@
 
 Reads sleeve targets from ``configs/portfolio.yaml`` and pulls live sleeve
 values from ``portfolio.state.PortfolioState``. Equity sleeve is now passive
-(CSPX via passive_equity strategy); opportunistic sleeve is plug-and-play
+(VWCE global, via passive_equity strategy); opportunistic sleeve is plug-and-play
 (strategies auto-discovered via ``core.strategy.registry``).
 """
 
@@ -285,7 +285,7 @@ with tab_bonds:
     st.caption("→ Manage positions on the Bond Ladder page.")
 
 
-# ---- EQUITY TAB (Phase 4 — passive CSPX) ------------------------
+# ---- EQUITY TAB (Phase 4 / v1.1.0 — passive global VWCE) ----------------
 
 with tab_equity:
     d = state["drift"]["equity"]
@@ -297,25 +297,27 @@ with tab_equity:
     st.markdown(
         "<div style='background:#dcfce7;border-left:4px solid #16a34a;padding:12px 16px;"
         "border-radius:4px;margin:14px 0;'>"
-        "<b>Passive S&P 500 via CSPX.L</b> (iShares Core S&P 500 UCITS ETF). "
-        "<br>Phase-4 decision: equity sleeve flipped from active V5 to passive after "
-        "V5 underperformed SPY by −4.6 %/yr in 13-year OOS. "
-        "See <code>_migration_log/V5_VS_SPY_DECISION.md</code>."
+        "<b>Passive Global Equity via VWCE.MI</b> (Vanguard FTSE All-World UCITS ETF, "
+        "~3700 holdings, developed + emerging, TER 0.19%). "
+        "<br>v1.1.0 (May 2026): switched from CSPX (S&P 500 USA) to VWCE for global diversification — "
+        "see <code>_migration_log/EQUITY_SLEEVE_GLOBAL_DECISION.md</code>. "
+        "Equity sleeve was earlier flipped from active V5 to passive after V5 underperformed "
+        "SPY by −4.6 %/yr in 13-year OOS — see <code>_migration_log/V5_VS_SPY_DECISION.md</code>."
         "</div>",
         unsafe_allow_html=True,
     )
 
-    # CSPX (or SPY proxy) recent equity curve, scaled to the sleeve target
+    # VWCE (or VT proxy) recent equity curve, scaled to the sleeve target
     try:
         from core.data.storage import DataStorage, load_global_config
 
         storage = DataStorage.from_config(load_global_config())
-        df = storage.get_prices_with_proxy("CSPX.L")
+        df = storage.get_prices_with_proxy("VWCE.MI")
         if df is None or df.empty:
-            st.info("Price data for CSPX.L (and SPY proxy) not available.")
+            st.info("Price data for VWCE.MI (and VT proxy) not available.")
         else:
             proxy_label = df.attrs.get("proxy_for")
-            px_used = df.attrs.get("proxy_symbol", "CSPX.L")
+            px_used = df.attrs.get("proxy_symbol", "VWCE.MI")
             # Last 12 months
             last_12m = df.tail(252)
             if not last_12m.empty:
@@ -328,7 +330,7 @@ with tab_equity:
                         x=series.index,
                         y=series.values,
                         mode="lines",
-                        name=("CSPX.L (via SPY proxy)" if proxy_label else "CSPX.L"),
+                        name=("VWCE.MI (via VT proxy)" if proxy_label else "VWCE.MI"),
                         line=dict(width=2, color="#16a34a"),
                     )
                 )
@@ -358,8 +360,8 @@ with tab_equity:
                 if proxy_label:
                     st.caption(
                         f"⚠️ Backtest using `{px_used}` as a proxy for `{proxy_label}` "
-                        f"(99 %+ correlated US-listed equivalent). The actual broker "
-                        f"position is CSPX.L."
+                        f"(US-listed equivalent — VT tracks the same FTSE All-World index). "
+                        f"The actual broker position is VWCE.MI."
                     )
     except Exception as e:
         st.warning(f"Equity curve unavailable: {e}")

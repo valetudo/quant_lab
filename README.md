@@ -28,7 +28,7 @@ user executes trades at the broker.
   │  Bonds  │     │   Equity   │                │ Opportunist.│
   │  50%    │     │    30%     │                │     20%     │
   │ ladder  │     │  passive   │                │  (cash)     │
-  │ (manual)│     │  CSPX UCITS│                │   reserved  │
+  │ (manual)│     │  VWCE UCITS│                │   reserved  │
   └─────────┘     └────────────┘                └─────────────┘
 ```
 
@@ -98,7 +98,7 @@ Env vars override (see `.env.example`):
 | Strategy | Sleeve | Status | Notes |
 |---|---|---|---|
 | `bonds_income` | bonds 50% | active | Manual ladder tracker, target buckets, drift alerts. |
-| `passive_equity` | equity 30% | active | Buy-once-hold-forever CSPX.L UCITS ETF (SPY proxy fallback). |
+| `passive_equity` | equity 30% | active | Buy-once-hold-forever VWCE.MI UCITS ETF — Vanguard FTSE All-World, ~3700 holdings, developed + emerging, TER 0.19% (VT proxy fallback for backtests). |
 | `pattern_finder` | opportunistic 20% | scaffold | Adapter for an external pattern-mining repo. Not yet wired. |
 | `quality_stocks` V5 | (archived) | archived | Reached STRONGLY ROBUST 8/8 in WF but lost -4.6 pp/yr to SPY → archived. See `_migration_log/V5_VS_SPY_DECISION.md`. |
 
@@ -120,6 +120,7 @@ Full walkthrough in `docs/adding_a_strategy.md`.
 | Phase 3 | Static allocation, Portfolio Overview, Quality Stocks V5 | `_migration_log/PHASE3_REPORT.md` |
 | Quality Stocks V5 | Full-history walk-forward + survivorship correction | `_migration_log/V5_FULL_VALIDATION_REPORT.md`, `_migration_log/V5_SURVIVORSHIP_VALIDATION_REPORT.md` |
 | V5 vs SPY decision | Benchmark gate fail → archive V5, flip equity sleeve to passive CSPX | `_migration_log/V5_VS_SPY_DECISION.md` |
+| v1.1.0 equity switch | CSPX (S&P 500) → VWCE (FTSE All-World global), addresses US-only bias | `_migration_log/EQUITY_SLEEVE_GLOBAL_DECISION.md` |
 | Phase 4 | Restructure to 50/30/20, modular strategy registry, passive equity sleeve | (see `CHANGELOG.md`) |
 | Pre-v1.0.0 | Code cleanup, security audit, git init | `_migration_log/cleanup_inventory.md`, `_migration_log/SECURITY_AUDIT.md` |
 

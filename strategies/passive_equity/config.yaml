@@ -1,16 +1,20 @@
 strategy_id: passive_equity
-description: "Passive S&P 500 exposure via CSPX UCITS ETF (Italian retail-accessible)"
+description: "Passive Global Equity exposure via VWCE UCITS ETF (FTSE All-World)"
 status: active
 
-# Primary ETF — preferred for European/Italian retail investors
-symbol: CSPX.L          # iShares Core S&P 500 UCITS ETF (London listing)
-# Alternative options documented for reference:
-#  - VUAA.L   Vanguard S&P 500 UCITS (accumulating, TER 0.07 %)
-#  - SPY5.L   SPDR S&P 500 UCITS (distributing, TER 0.03 %)
-#  - CSPX.MI  Same CSPX, Borsa Italiana listing
+# Primary ETF — Vanguard FTSE All-World, accumulating, Borsa Italiana in EUR.
+symbol: VWCE.MI         # Vanguard FTSE All-World UCITS ETF (ISIN IE00BK5BQT80)
+# Alternative tickers (same ISIN):
+#  - VWCE.L   London Stock Exchange (EUR or GBP)
+#  - VWCE.DE  XETRA Germany (EUR)
+#  - VWCE.AS  Amsterdam (EUR)
+# Alternative ETFs documented:
+#  - IWDA.AS / SWDA.L   iShares MSCI World (developed only, TER 0.20%)
+#  - SPYY.DE            SPDR MSCI ACWI (TER 0.12%, smaller AUM)
+#  - CSPX.L / CSPX.MI   iShares Core S&P 500 (US-only, TER 0.07%, previous choice)
 
-# Capital allocated (overridden by portfolio.yaml * sleeve weight)
-capital_eur: 30000      # 30 % of €100k total portfolio
+# Capital allocated (overridden by portfolio.yaml × sleeve weight)
+capital_eur: 30000      # 30% of €100k total portfolio
 
 # No rebalancing — pure buy-and-hold
 rebalance_frequency: never
@@ -20,12 +24,22 @@ commission_bps: 5
 slippage_bps: 5
 
 notes: |
-  Phase 4 equity sleeve: passive replacement for Quality Stocks V5
-  (archived after underperforming SPY by −4.6 %/yr in 13-y OOS).
-  CSPX is preferred for IT-retail investors because:
-    - UCITS-compliant (PRIIPs KID in Italian)
-    - Ireland-domiciled (favourable US dividend withholding)
-    - Accumulating (no distribution complications)
-    - TER 0.07 %  (competitive)
-    - Dual-listed: CSPX.MI (Milan) and CSPX.L (London)
-  Backtest uses SPY as a proxy when CSPX is not in the local price cache.
+  Phase 4 equity sleeve, revised in v1.1.0 (May 2026).
+
+  Original choice was CSPX (S&P 500 USA only) — switched to VWCE after
+  recognizing US-only was an unexamined default from the Quantopian era.
+
+  VWCE rationale:
+    - True global diversification (~3700 holdings, developed + emerging)
+    - ~62% USA / 38% rest of world — natural currency diversification
+    - TER 0.19% (reduced from 0.22% in Oct 2025 — very competitive)
+    - Accumulating (Italian tax efficiency: dividends reinvested without 26% drag)
+    - UCITS-compliant, Ireland-domiciled (favourable US dividend withholding)
+    - Listed on Borsa Italiana in EUR (no FX conversion for retail purchase)
+    - AUM €37B+ (zero closure risk)
+
+  Backtest fallback: when VWCE.MI is missing from the local FMP cache (it
+  listed only in 2019), `DataStorage.get_prices_with_proxy()` falls back to
+  VT (Vanguard Total World, US-listed equivalent) for historical depth.
+
+  Full decision rationale: _migration_log/EQUITY_SLEEVE_GLOBAL_DECISION.md

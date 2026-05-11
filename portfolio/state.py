@@ -121,16 +121,18 @@ class PortfolioState:
     def _equity_sleeve_value(self) -> float:
         """Live equity sleeve value.
 
-        Phase 4: the equity sleeve is passive (CSPX via passive_equity strategy).
+        Phase 4 / v1.1.0: the equity sleeve is passive (VWCE global, via the
+        passive_equity strategy; pre-v1.1.0 used CSPX S&P 500).
         We mark-to-market by scaling the target capital by the change in the
-        configured ETF (or its SPY proxy) since some "entry date". For now we
+        configured ETF (or its retail proxy: VT for VWCE, SPY for CSPX) since
+        some "entry date". For now we
         use the first available date in the parquet — i.e. an as-if "bought at
         the start of available data" mark, which is a soft fallback until the
         user records an actual purchase date in a positions ledger.
         """
         target = self.portfolio.get_sleeve_capital("equity")
         # Read the passive_equity config for the ETF symbol
-        sym = "CSPX.L"
+        sym = "VWCE.MI"
         cfg = self.cfg.get("strategy_configs", {}).get("passive_equity", {})
         cfg_path = cfg.get("config_path")
         if cfg_path:

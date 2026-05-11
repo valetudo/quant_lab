@@ -54,18 +54,20 @@ def _make_strategy(strategy_id: str, *, storage: DataStorage, capital: float):
     if strategy_id == "passive_equity":
         from strategies.passive_equity import PassiveEquity
 
-        return PassiveEquity(symbol="CSPX.L", initial_capital_eur=capital)
+        return PassiveEquity(symbol="VWCE.MI", initial_capital_eur=capital)
     raise SystemExit(f"unknown strategy: {strategy_id}")
 
 
 def _build_panel(strategy_id: str, start: date, end: date, storage: DataStorage) -> pd.DataFrame:
     if strategy_id == "passive_equity":
-        # Phase 4 equity sleeve: try CSPX.L first (via parquet tree), then
-        # fall back to SPY proxy. ETFs live in the etf/ parquet universe,
-        # not the DuckDB store, so we use get_prices_panel (parquet reader).
-        panel = storage.get_prices_panel(["CSPX.L", "SPY"], start, end)
+        # v1.1.0 equity sleeve: try VWCE.MI first (via parquet tree), then
+        # fall back to VT (US-listed FTSE All-World proxy). CSPX/SPY also
+        # included for backward compatibility with pre-v1.1.0 backtests.
+        # ETFs live in the etf/ parquet universe (not the DuckDB store),
+        # so we use get_prices_panel (parquet reader).
+        panel = storage.get_prices_panel(["VWCE.MI", "VT", "CSPX.L", "SPY"], start, end)
         if panel.empty:
-            log.warning("No CSPX.L or SPY data — returning empty panel.")
+            log.warning("No VWCE.MI / VT / CSPX.L / SPY data — returning empty panel.")
         return panel
 
     if strategy_id == "bonds_income":
