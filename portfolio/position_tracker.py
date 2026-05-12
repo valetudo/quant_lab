@@ -144,7 +144,20 @@ class PositionTracker:
 
     # ---------- mutators ----------
 
-    def add_position(self, position: Position) -> None:
+    def _active_isins(self) -> set[str]:
+        return {p.isin for p in self._positions if p.status == "active"}
+
+    def add_position(self, position: Position, *, allow_duplicate: bool = False) -> None:
+        """Append a new position. Raises ``ValueError`` if an active row
+        with the same ISIN already exists (set ``allow_duplicate=True`` to
+        bypass — only intended for test fixtures).
+        """
+        if not allow_duplicate and position.isin in self._active_isins():
+            raise ValueError(
+                f"ISIN {position.isin!r} is already an active position. "
+                f"Rimuovi la riga esistente prima di re-inserirla, oppure "
+                f"usa il bottone 'Modifica' su Aggiorna Posizioni."
+            )
         self._positions.append(position)
         self.save()
 

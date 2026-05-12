@@ -3,6 +3,48 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] — 2026-05-12
+
+Hotfix: three issues identified during v2.0.0 production use.
+
+### Fixed
+
+- **Inflated bond sleeve totals were caused by duplicate-ISIN inserts**, not by a math error.
+  Diagnosis on the user's parquet showed one ISIN with 12 active rows and several with 4 — the
+  `quantity × price / 100` formula is correct under the documented "nominal EUR" convention
+  used uniformly across all write paths (Aggiorna Posizioni form, Ladder Builder confirmation,
+  legacy `LadderTracker` dual-write). Root cause: `PositionTracker.add_position` had no
+  duplicate guard, so repeated form submissions or re-runs of the Ladder Builder confirmation
+  silently appended copies.
+- `PositionTracker.add_position` now raises `ValueError` when an active row with the same
+  ISIN already exists. Pass `allow_duplicate=True` to bypass (test fixtures only).
+- **Ladder chart legibility in dark mode**: every annotation, axis title, tick label, legend
+  and title now uses a theme-neutral mid-grey (`#888888`) with transparent paper + plot
+  backgrounds. Labels read cleanly under both the light and dark Streamlit themes. Same
+  treatment applied to the cash-flow timeline.
+
+### Added
+
+- **Per-row removal UI** in `3_Aggiorna_Posizioni.py` for the Bonds, Equity and Alternative
+  tabs. Two-step confirmation, reason selectable (`sold` / `matured` / `error_correction`).
+  Goes through the existing `PositionTracker.remove_position()` (soft-delete, position
+  remains in the parquet with `status` flipped).
+- **Full reset workflow** (also in Aggiorna Posizioni) — text-confirmation guard (`RESET`),
+  backs up the parquet to `positions_reset_backup_<ts>.parquet` before flipping every active
+  row to `status: reset`.
+- **Aggiorna Posizioni link** in `1_Portfolio_Overview.py` so management is a single click
+  away. The Overview keeps the read-only role; all mutations go through Aggiorna Posizioni.
+- **Duplicate-ISIN error toast**: the Aggiorna Posizioni bond + ETF add forms now catch
+  the new `ValueError` and surface it as a red banner with the Italian explanation message,
+  instead of bubbling up as an uncaught exception.
+
+### Migration
+
+- Pre-v2.0.1 parquet backed up to
+  `data_storage/positions/portfolio_positions_pre_v201_backup.parquet` (gitignored).
+- **No schema migration needed** — the math was correct. Users can either remove duplicate
+  rows manually via the new UI or click the Reset Portfolio button and re-enter cleanly.
+
 ## [2.0.0] — 2026-05-12
 
 ### MAJOR — UX refactor: from development framework to operational tool

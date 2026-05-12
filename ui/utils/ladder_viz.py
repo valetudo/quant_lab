@@ -38,6 +38,14 @@ _CATEGORY_LABELS_IT = {
     "gov_foreign": "Titoli di stato esteri",
 }
 
+# Theme-neutral text/grid colors. Streamlit can render with either a
+# light or a dark theme; choosing mid-grey + transparent backgrounds
+# keeps every label readable in both, at the cost of slightly washed-out
+# contrast on either extreme. The user-visible labels are the priority.
+_LABEL_COLOR = "#888888"
+_GRID_COLOR = "rgba(128,128,128,0.25)"
+_AXIS_COLOR = "#888888"
+
 
 def build_ladder_chart(proposal: "LadderProposal") -> go.Figure:
     """Horizontal ladder visualization.
@@ -124,7 +132,9 @@ def build_ladder_chart(proposal: "LadderProposal") -> go.Figure:
                 )
                 cumulative += bond.amount_eur
 
-        # Inline annotation at the left edge of the rung
+        # Inline annotation at the left edge of the rung. Explicit color +
+        # transparent background so labels stay legible in both light and
+        # dark Streamlit themes.
         adapted_marker = " ⚠️" if rung.composition_was_adapted else ""
         fig.add_annotation(
             x=today,
@@ -137,8 +147,9 @@ def build_ladder_chart(proposal: "LadderProposal") -> go.Figure:
             showarrow=False,
             xanchor="right",
             xshift=-12,
-            font=dict(size=11),
+            font=dict(size=11, color=_LABEL_COLOR, family="Arial"),
             align="right",
+            bgcolor="rgba(0,0,0,0)",
         )
 
     # Legend entries (shapes don't auto-generate legend items).
@@ -155,13 +166,21 @@ def build_ladder_chart(proposal: "LadderProposal") -> go.Figure:
 
     last_target = proposal.rungs[-1].target_maturity_date
     fig.update_layout(
-        title=dict(text="🪜 La tua scala obbligazionaria", font=dict(size=20)),
+        title=dict(
+            text="🪜 La tua scala obbligazionaria",
+            font=dict(size=20, color=_LABEL_COLOR),
+        ),
         xaxis=dict(
-            title="Scadenza nel tempo →",
+            title=dict(
+                text="Scadenza nel tempo →",
+                font=dict(color=_LABEL_COLOR),
+            ),
             type="date",
             range=[today - pd.Timedelta(days=180), last_target + pd.Timedelta(days=365)],
             showgrid=True,
-            gridcolor="rgba(200,200,200,0.3)",
+            gridcolor=_GRID_COLOR,
+            color=_AXIS_COLOR,
+            tickfont=dict(color=_LABEL_COLOR),
         ),
         yaxis=dict(
             range=[0.4, len(proposal.rungs) + 0.6],
@@ -169,7 +188,9 @@ def build_ladder_chart(proposal: "LadderProposal") -> go.Figure:
             showgrid=False,
         ),
         height=max(420, 70 * len(proposal.rungs)),
-        plot_bgcolor="white",
+        paper_bgcolor="rgba(0,0,0,0)",  # transparent → inherits Streamlit theme
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=_LABEL_COLOR),
         hovermode="closest",
         legend=dict(
             orientation="h",
@@ -177,6 +198,7 @@ def build_ladder_chart(proposal: "LadderProposal") -> go.Figure:
             y=1.02,
             xanchor="center",
             x=0.5,
+            font=dict(color=_LABEL_COLOR),
         ),
         margin=dict(l=120, r=40, t=80, b=40),
     )
@@ -305,16 +327,21 @@ def build_cashflow_timeline(proposal: "LadderProposal") -> go.Figure:
         bgcolor="rgba(46, 125, 50, 0.10)",
         bordercolor="#2E7D32",
         borderwidth=1,
-        font=dict(size=12),
+        font=dict(size=12, color=_LABEL_COLOR),
     )
 
     fig.update_layout(
-        title=dict(text="💰 Quando arrivano i soldi", font=dict(size=18)),
+        title=dict(
+            text="💰 Quando arrivano i soldi",
+            font=dict(size=18, color=_LABEL_COLOR),
+        ),
         xaxis=dict(
             title="",
             type="date",
             showgrid=True,
-            gridcolor="rgba(200,200,200,0.3)",
+            gridcolor=_GRID_COLOR,
+            color=_AXIS_COLOR,
+            tickfont=dict(color=_LABEL_COLOR),
         ),
         yaxis=dict(
             range=[0.4, 3.4],
@@ -323,13 +350,16 @@ def build_cashflow_timeline(proposal: "LadderProposal") -> go.Figure:
             zeroline=False,
         ),
         height=320,
-        plot_bgcolor="white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=_LABEL_COLOR),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=-0.2,
             xanchor="center",
             x=0.5,
+            font=dict(color=_LABEL_COLOR),
         ),
         margin=dict(l=40, r=40, t=80, b=60),
     )

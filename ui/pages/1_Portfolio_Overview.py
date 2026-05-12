@@ -254,6 +254,10 @@ with tab_a:
 # ----- refresh / audit log -----
 
 st.markdown("---")
+st.info(
+    "💡 Per **modificare, aggiungere o rimuovere posizioni** vai a "
+    "**📥 Aggiorna Posizioni** — è il punto unico di gestione del portfolio."
+)
 left, right = st.columns([3, 1])
 with left:
     st.caption(
@@ -262,5 +266,10 @@ with left:
         "vai a **🛠️ Strumenti → Data Status**."
     )
 with right:
-    if st.button("🔄 Ricarica"):
-        st.rerun()
+    rc1, rc2 = st.columns(2)
+    with rc1:
+        if st.button("🔄 Ricarica"):
+            st.rerun()
+    with rc2:
+        if st.button("📥 Gestisci"):
+            st.switch_page("pages/3_Aggiorna_Posizioni.py")
