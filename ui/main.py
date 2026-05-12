@@ -1,7 +1,10 @@
-"""Streamlit entry point for quant_lab.
+"""Streamlit entry point for Quant Lab.
 
 Run:
     streamlit run ui/main.py
+
+Multi-page apps mount this file as the root; per-page logic lives under
+``ui/pages/``. The root page redirects to the Home landing.
 """
 
 from __future__ import annotations
@@ -19,53 +22,22 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 import streamlit as st
 
-from core.data.storage import DataStorage, load_global_config
+st.set_page_config(
+    page_title="Quant Lab",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
+st.title("📈 Quant Lab")
+st.caption("Strumento personale di gestione portfolio multi-asset.")
 
-def main() -> None:
-    st.set_page_config(
-        page_title="quant_lab",
-        page_icon="📈",
-        layout="wide",
-        initial_sidebar_state="expanded",
+# Bounce to Home; the user can still pick any page from the sidebar.
+try:
+    st.switch_page("pages/0_Home.py")
+except Exception:
+    # Older Streamlit versions might not support switch_page from main.
+    st.info(
+        "Apri la pagina **🏠 Home** dal menù laterale per iniziare. "
+        "Da lì puoi scegliere se costruire il portfolio o aggiornare le posizioni esistenti."
     )
-
-    st.title("📈 quant_lab")
-    st.caption("Strategy framework, backtest, screening and analytics.")
-
-    cfg = load_global_config()
-    storage = DataStorage.from_config(cfg)
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(
-            "DuckDB store",
-            "present" if storage.duckdb_path.exists() else "missing",
-            str(storage.duckdb_path),
-        )
-    with col2:
-        st.metric(
-            "Bonds DB",
-            "present" if storage.bonds_db_exists() else "missing",
-            str(storage.bonds_db_path),
-        )
-    with col3:
-        st.metric("Capital (EUR)", f"{cfg.get('initial_capital_eur', 50000):,}")
-
-    st.markdown("---")
-    st.subheader("Pages")
-    st.markdown(
-        "- **Portfolio Overview** — multi-strategy aggregate (stub).\n"
-        "- **Strategies** — list and drill-down per strategy.\n"
-        "- **Backtest Runner** — pick a strategy, parameters, run.\n"
-        "- **Data Status** — universe coverage and last-update.\n"
-        "- **Bonds Screener** — Borsa Italiana screener UI.\n"
-        "- **Debug Logs** — view migration and runtime logs."
-    )
-
-    with st.expander("Configuration"):
-        st.json(cfg)
-
-
-if __name__ == "__main__":
-    main()

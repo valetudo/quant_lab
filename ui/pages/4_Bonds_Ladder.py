@@ -26,18 +26,75 @@ from core.data.providers.borsa_italiana_provider import BorsaItalianaProvider
 from strategies.bonds_income.ladder import LadderConfig, LadderTracker
 from ui.utils.cache import get_storage
 
-st.set_page_config(page_title="Bond Ladder", page_icon="🏗️", layout="wide")
-st.title("🏗️ Bond Ladder Designer")
-st.caption("Track your bond ladder. Identify gaps. Suggest candidates. NOT a trading strategy.")
-
-st.info(
-    "💡 Vuoi **costruire un nuovo ladder da zero** invece di tracciare uno "
-    "esistente? Vai alla pagina **🏗️ Ladder Builder** dal menù laterale: "
-    "imposti budget + n° gradini + duration e ottieni una proposta concreta "
-    "di acquisto da portare al broker."
+st.set_page_config(page_title="Bonds — Ladder", page_icon="💰", layout="wide")
+st.title("💰 Bonds — Ladder")
+st.caption(
+    "Tracker della scala obbligazionaria + identificazione gap + suggerimenti. "
+    "Non è una trading strategy: decisione e ordini sono manuali."
 )
 
+# Quick link to Ladder Builder
+col_link, col_build = st.columns([4, 1])
+with col_link:
+    st.info(
+        "💡 Vuoi **costruire un nuovo ladder da zero** invece di tracciare uno "
+        "esistente? Apri il **Ladder Builder** dal bottone a destra → imposti "
+        "budget + n° gradini + duration e ottieni una proposta concreta di acquisto."
+    )
+with col_build:
+    if st.button("🏗️ Apri Ladder Builder", use_container_width=True, type="primary"):
+        st.switch_page("pages/8_Ladder_Builder.py")
+
 storage = get_storage()
+
+# ===== Bonds data freshness banner =====
+
+import os
+
+bonds_db = storage.bonds_db_path if hasattr(storage, "bonds_db_path") else None
+st.markdown("### 🔄 Stato dati bonds")
+fs1, fs2 = st.columns([3, 1])
+with fs1:
+    if bonds_db and bonds_db.exists():
+        last_modified = pd.Timestamp.fromtimestamp(os.path.getmtime(bonds_db))
+        age_days = (pd.Timestamp.now() - last_modified).days
+        if age_days < 2:
+            st.success(
+                f"✅ Dati aggiornati ({last_modified.strftime('%Y-%m-%d %H:%M')}, "
+                f"{age_days}g fa)"
+            )
+        elif age_days < 7:
+            st.info(
+                f"📅 Ultimo aggiornamento: {age_days} giorni fa "
+                f"({last_modified.strftime('%Y-%m-%d')})"
+            )
+        else:
+            st.warning(
+                f"⚠️ Dati stale: {age_days} giorni fa. "
+                f"Aggiorna per prezzi più recenti."
+            )
+    else:
+        st.error("❌ Database bonds non trovato. Aggiorna ora.")
+with fs2:
+    if st.button("🔄 Aggiorna prezzi bonds", help="Re-scrape Borsa Italiana"):
+        with st.spinner("Refresh in corso..."):
+            try:
+                from scripts.refresh_bonds_db import refresh_bonds_db
+
+                stats = refresh_bonds_db(bonds_db)
+                if stats.get("status") == "scaffold":
+                    st.warning(
+                        f"⚠️ {stats['message']}"
+                    )
+                else:
+                    st.success(
+                        f"✅ Aggiornati {stats.get('n_bonds', '?')} bond"
+                    )
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Errore refresh: {e}")
+
+st.markdown("---")
 
 # Sidebar: ladder config
 st.sidebar.header("Target ladder")

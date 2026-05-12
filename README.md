@@ -58,24 +58,37 @@ python -m venv .venv
 .venv\Scripts\activate           # Windows (or source .venv/bin/activate on POSIX)
 pip install -r requirements.txt
 
-# Configure secrets:
-cp .env.example .env
-# edit .env and set FMP_API_KEY
+# Configure secrets
+cp .env.example .env             # then edit and set FMP_API_KEY
 
-# One-time: copy bonds.db into place (if you also run the bonds scraper repo)
+# One-time data setup (if you also run the sister bonds/ repo)
 python scripts/migrate_bonds_db.py
-
-# One-time: warm the FMP cache (~5 min, ~1700 API calls)
 python scripts/migrate_prices_to_fmp.py --start 2016-01-01 --end 2025-12-31
 
-# Run the test suite
-pytest tests/ strategies/ -ra
-
-# Launch the dashboard
+# Run the dashboard
 streamlit run ui/main.py
 ```
 
-Windows shortcut: double-click `start.bat` (or `start.ps1` from PowerShell).
+Windows shortcut: double-click `start.bat` (or `start.ps1` from PowerShell). The dashboard opens at <http://localhost:8501> and lands on the **🏠 Home** page.
+
+## Typical workflow
+
+### First time — build the portfolio from scratch
+
+1. **🏠 Home** → "Costruisci portfolio da zero"
+2. **🏗️ Costruisci Portfolio** → pick your own asset allocation (e.g. 50/30/20)
+3. Build each section:
+   - **💰 Bonds** — Ladder Builder generates a concrete purchase proposal
+   - **🌍 Equity** — guided ETF selection (VWCE recommended)
+   - **🎯 Alternative** — explore active strategies (Pattern Finder + future)
+
+### Existing investor — track what you already own
+
+1. **🏠 Home** → "Aggiorna posizioni esistenti"
+2. **📥 Aggiorna Posizioni** → enter bond + ETF holdings manually
+3. **📊 Portfolio Overview** → real-time P&L, allocation drift, per-asset detail
+
+The **Backtest Lab** (was Backtest Runner) is in **🛠️ Strumenti** — only needed when validating an active alternative strategy.
 
 ## Configuration
 

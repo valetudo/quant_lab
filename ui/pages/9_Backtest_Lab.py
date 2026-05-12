@@ -43,8 +43,15 @@ from ui.utils.streaming_runner import (
     start_live_run,
 )
 
-st.set_page_config(page_title="Backtest Runner", page_icon="🔬", layout="wide")
-st.title("🔬 Backtest Runner")
+st.set_page_config(page_title="Backtest Lab", page_icon="🔬", layout="wide")
+st.title("🔬 Backtest Lab")
+
+st.warning(
+    "⚠️ **Backtest Lab è per strategie alternative attive.** Non usarlo per "
+    "validare scelte passive (ETF World, bond ladder) — quelle sono decisioni "
+    "strutturali, non statistiche. Per asset passivi vedi le pagine dedicate "
+    "(💰 Bonds — Ladder e 🌍 Equity — World ETF)."
+)
 
 storage = get_storage()
 repo_root = _PROJECT_ROOT

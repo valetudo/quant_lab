@@ -171,6 +171,27 @@ def add_position(
     }
     df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
     save_positions(df, path)
+    # Dual-write: mirror into the unified PositionTracker so cross-asset
+    # pages (Portfolio Overview, Home, Aggiorna Posizioni) see this bond.
+    try:
+        from portfolio.position_tracker import PositionTracker
+
+        PositionTracker().add_bond(
+            isin=isin,
+            name=description or isin,
+            quantity=float(quantity),
+            avg_purchase_price=float(avg_purchase_price),
+            purchase_date=pdate,
+            issuer=(nation if (issuer_type or "").lower() == "government" else None),
+            maturity_date=mdate,
+            coupon_rate=float(coupon) / 100.0 if coupon else None,
+            coupon_frequency=1,
+            ytm_at_purchase=float(ytm_at_purchase) / 100.0 if ytm_at_purchase else None,
+            rating=rating,
+            notes=notes or "",
+        )
+    except Exception as e:
+        log.warning("dual-write to PositionTracker failed for %s: %s", isin, e)
     return df
 
 

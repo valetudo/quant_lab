@@ -3,6 +3,93 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] — 2026-05-12
+
+### MAJOR — UX refactor: from development framework to operational tool
+
+The codebase below the UI is largely unchanged; the navigation, the
+landing experience, and the position-tracking layer were rewritten to
+treat Quant Lab as a daily operational tool rather than a research
+notebook.
+
+### Added
+
+- **`portfolio/position_tracker.py`** — unified `PositionTracker` for all
+  asset classes (bond / equity / alternative / cash), backed by
+  `data_storage/positions/portfolio_positions.parquet`. Provides
+  `add_bond` / `add_equity` / `add_alternative` helpers, status
+  tracking, and `unrealized_pnl()` / `current_value_eur()` aggregates.
+- **`portfolio/price_provider.py`** — `PriceProvider` looks up current
+  prices across asset classes (bonds.db for bonds, FMP parquet store
+  with VWCE/IWDA/SWDA/CSPX/VUSA/VUAA ISIN→ticker mapping for ETFs,
+  cost-basis fallback for alternative).
+- **UI page `0_Home.py`** — landing with binary choice (Costruisci da
+  zero / Aggiorna posizioni). Shows current sleeve breakdown if
+  positions exist.
+- **UI page `2_Costruisci_Portfolio.py`** — guided build workflow.
+  Step 1: pick free-form bond/equity/alternative percentages.
+  Step 2: launch the dedicated section page with the per-sleeve budget.
+- **UI page `3_Aggiorna_Posizioni.py`** — manual position entry tabs for
+  bonds + ETFs. Writes through `PositionTracker`. Shows live asset
+  allocation from the positions entered.
+- **UI page `5_Equity_World_ETF.py`** — VWCE-first guidance: hero banner,
+  five-reason rationale, ETF comparison table (VWCE / IWDA / SPYY /
+  VUSA / CSPX), purchase form, fiscal notes for IT retail.
+- **UI page `6_Alternative_Strategies.py`** — registry-driven listing
+  of opportunistic strategies with status badges, README expander,
+  position registration form, and a button to open the strategy in
+  Backtest Lab.
+- **UI page `7_Strumenti.py`** — hub for power-user pages (Backtest Lab,
+  Bonds Screener, Data Status, Debug Logs, Ladder Builder).
+- **Bonds refresh button** in the renamed `4_Bonds_Ladder.py`. Delegates
+  to `scripts/refresh_bonds_db.py` which copies the sister `bonds/`
+  repo's freshly-scraped DB when available and returns a structured
+  status the UI can surface.
+- **`scripts/refresh_bonds_db.py`** — scaffold for in-place bonds.db
+  refresh (today: copy from sister repo).
+
+### Changed
+
+- **UI page `1_Portfolio_Overview.py`** rewritten as a real-position
+  performance tracker (P&L per position and per asset class, pie chart,
+  per-asset-class tabs). Decoupled from the static-allocation model.
+- **Page renames**: `3_Backtest_Runner.py` → `9_Backtest_Lab.py` with a
+  disclaimer banner; `5_Bonds_Screener.py` → `10_Bonds_Screener.py`;
+  `4_Data_Status.py` → `11_Data_Status.py`;
+  `6_Debug_Logs.py` → `12_Debug_Logs.py`;
+  `8_Bond_Ladder.py` → `4_Bonds_Ladder.py`;
+  `9_Ladder_Builder.py` → `8_Ladder_Builder.py`. Streamlit sidebar now
+  reflects workflow priority (numerals 0–7 = primary, 8–12 = advanced).
+- **`ui/main.py`** redirects to `0_Home.py` on entry.
+- **`strategies/bonds_income/positions_io.py`** `add_position()` now
+  dual-writes to the unified `PositionTracker` so cross-asset pages
+  see every bond added via the legacy Ladder forms.
+
+### Removed (from top-level nav)
+
+- **`ui/pages/2_Strategies.py`** archived to
+  `ui/_archived/2_Strategies.py.bak` — its function is fully absorbed
+  by `6_Alternative_Strategies.py` (registry-driven) and the per-asset
+  pages. The file is preserved for history.
+
+### Architectural notes
+
+- **Asset allocation is no longer hard-coded 50/30/20.** The Costruisci
+  workflow asks the user every time; `configs/portfolio.yaml` keeps the
+  default only as a fallback for the legacy `PortfolioState` /
+  `StaticPortfolio` code paths.
+- **Single source of truth for positions**: `portfolio_positions.parquet`
+  via `PositionTracker`. The bond-specific `data_storage/bonds/positions.parquet`
+  stays for `LadderTracker`'s detail-rich view (composition, gaps,
+  cash flow) and is kept in sync via dual-write.
+- **Backward compatibility absolute**: every v1.x public API still works;
+  88 tests still green.
+
+### Documentation
+
+- **`_migration_log/V2_UX_REFACTOR.md`** — full rationale, side-by-side
+  navigation diff, lessons learned.
+
 ## [1.2.0] — 2026-05-12
 
 ### Added
