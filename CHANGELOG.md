@@ -3,6 +3,40 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-05-12
+
+Navigation overhaul: grouped sections in the sidebar via `st.navigation`,
+and Bonds Ladder + Ladder Builder unified into a single two-tab page.
+
+### Changed
+
+- **Sidebar grouping** via `st.navigation` (Streamlit ≥ 1.36). The flat
+  page list is replaced by two named sections:
+  - **📁 IL MIO PORTAFOGLIO**: Portfolio Overview, Aggiorna Posizioni, Costruisci Portfolio.
+  - **🔬 STRUMENTI DI RICERCA**: Bonds — Ladder & Builder, Equity — World ETF, Alternative Strategies, Bonds Screener, Backtest Lab, Data Status.
+  - Home (🏠) sits above both sections.
+- **Bonds page unified**: `ui/pages/4_Bonds_Ladder.py` now hosts two tabs:
+  - **📊 Tracker** — composition / cash-flow projection / gap analysis / position manager / health check (was the standalone Bond Ladder page).
+  - **🏗️ Builder** — input parameters → `LadderBuilder` proposal → literal ladder chart + cash-flow timeline + confirmation workflow (was the standalone Ladder Builder page).
+  - The shared bonds-data freshness banner + refresh button sits above both tabs.
+- **`ui/main.py`** rewritten to declare pages explicitly via `st.Page` + `st.navigation` (auto-discovery from `pages/` is suppressed when `st.navigation` is invoked).
+
+### Removed (from primary nav)
+
+- **`ui/pages/7_Strumenti.py`** — replaced by the named sections.
+- **`ui/pages/8_Ladder_Builder.py`** — merged into the Bonds page as a tab.
+- **`ui/pages/12_Debug_Logs.py`** — moved out of the primary nav (developer-only).
+- All three archived to `ui/_archived/*.py.bak` for history.
+
+### Notes
+
+- Inter-page `st.switch_page("pages/8_Ladder_Builder.py")` calls were already
+  removed (the only one lived in the old Strumenti hub, now archived).
+- All 97 tests still pass; 10/10 navigation routes serve HTTP 200; AppTest
+  passes on every primary page.
+- Backward compatibility: every backend API (`LadderTracker`, `LadderBuilder`,
+  `PositionTracker`, `DirectaXLSXImporter`, …) is unchanged.
+
 ## [2.1.0] — 2026-05-12
 
 ### Added

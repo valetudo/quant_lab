@@ -263,7 +263,7 @@ with left:
     st.caption(
         "I prezzi mostrati sono gli ultimi disponibili in cache "
         "(bonds.db per i bond, FMP cache per gli ETF). Per aggiornare i prezzi "
-        "vai a **🛠️ Strumenti → Data Status**."
+        "vai a **📁 Data Status** dal menù laterale."
     )
 with right:
     rc1, rc2 = st.columns(2)

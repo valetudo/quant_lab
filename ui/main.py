@@ -1,10 +1,36 @@
 """Streamlit entry point for Quant Lab.
 
-Run:
+Run::
+
     streamlit run ui/main.py
 
-Multi-page apps mount this file as the root; per-page logic lives under
-``ui/pages/``. The root page redirects to the Home landing.
+Uses ``st.navigation`` with named sections (Streamlit ≥ 1.36) so the
+sidebar groups pages by purpose rather than listing them flat. When
+``st.navigation`` is invoked, Streamlit suppresses its automatic page
+discovery in ``ui/pages/``, so the file list there is purely the
+implementation — the displayed nav is what we declare below.
+
+Sidebar layout:
+
+```
+🏠 Home
+
+📁 IL MIO PORTAFOGLIO
+   📊 Portfolio Overview
+   📥 Aggiorna Posizioni
+   🏗️ Costruisci Portfolio
+
+🔬 STRUMENTI DI RICERCA
+   💰 Bonds — Ladder & Builder
+   🌍 Equity — World ETF
+   🎯 Alternative Strategies
+   🔍 Bonds Screener
+   🔬 Backtest Lab
+   📁 Data Status
+```
+
+Debug Logs is intentionally archived from the primary nav; the page
+file lives in ``ui/_archived/`` and isn't reachable from the sidebar.
 """
 
 from __future__ import annotations
@@ -22,22 +48,50 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 import streamlit as st
 
-st.set_page_config(
-    page_title="Quant Lab",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded",
+# Page declarations. Paths are relative to this entry script.
+home = st.Page("pages/0_Home.py", title="Home", icon="🏠", default=True)
+
+portfolio_overview = st.Page(
+    "pages/1_Portfolio_Overview.py", title="Portfolio Overview", icon="📊"
+)
+aggiorna_posizioni = st.Page(
+    "pages/3_Aggiorna_Posizioni.py", title="Aggiorna Posizioni", icon="📥"
+)
+costruisci_portfolio = st.Page(
+    "pages/2_Costruisci_Portfolio.py", title="Costruisci Portfolio", icon="🏗️"
 )
 
-st.title("📈 Quant Lab")
-st.caption("Strumento personale di gestione portfolio multi-asset.")
+bonds_ladder = st.Page(
+    "pages/4_Bonds_Ladder.py", title="Bonds — Ladder & Builder", icon="💰"
+)
+equity_world = st.Page(
+    "pages/5_Equity_World_ETF.py", title="Equity — World ETF", icon="🌍"
+)
+alternative = st.Page(
+    "pages/6_Alternative_Strategies.py", title="Alternative Strategies", icon="🎯"
+)
+bonds_screener = st.Page(
+    "pages/10_Bonds_Screener.py", title="Bonds Screener", icon="🔍"
+)
+backtest_lab = st.Page("pages/9_Backtest_Lab.py", title="Backtest Lab", icon="🔬")
+data_status = st.Page("pages/11_Data_Status.py", title="Data Status", icon="📁")
 
-# Bounce to Home; the user can still pick any page from the sidebar.
-try:
-    st.switch_page("pages/0_Home.py")
-except Exception:
-    # Older Streamlit versions might not support switch_page from main.
-    st.info(
-        "Apri la pagina **🏠 Home** dal menù laterale per iniziare. "
-        "Da lì puoi scegliere se costruire il portfolio o aggiornare le posizioni esistenti."
-    )
+pg = st.navigation(
+    {
+        "": [home],
+        "📁 IL MIO PORTAFOGLIO": [
+            portfolio_overview,
+            aggiorna_posizioni,
+            costruisci_portfolio,
+        ],
+        "🔬 STRUMENTI DI RICERCA": [
+            bonds_ladder,
+            equity_world,
+            alternative,
+            bonds_screener,
+            backtest_lab,
+            data_status,
+        ],
+    }
+)
+pg.run()
