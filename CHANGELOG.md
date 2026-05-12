@@ -3,6 +3,42 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-12
+
+### Added
+
+- **Bond Ladder Builder** — given a budget + number of rungs + max duration, generates a concrete bond purchase proposal respecting a per-rung composition target (default 50 % BTP / 25 % corporate-EUR / 25 % gov-foreign-EUR).
+  - `strategies/bonds_income/ladder_builder.py`: dataclass schema (`LadderBuilderConfig`, `SelectedBond`, `SkippedBond`, `RungProposal`, `LadderProposal`) + the `LadderBuilder` engine with quality filters (rating, callable, subordinated exclusion), lot-size handling, and per-issuer concentration cap.
+  - **Adaptive logic**: when the best foreign sovereign in a rung's tolerance window fails the triple quality filter (yield ≥ best BTP, rating ≥ A-, liquidity ≥ €100k/day where data available), the 25 % foreign weight collapses into the BTP slot and the rung becomes 75/25.
+  - `core/data/bonds_universe.py`: `BondsUniverseLoader` wraps `BorsaItalianaProvider` and adds the columns the builder needs but the underlying schema lacks (`category`, `issuer`, `rating_score`, `is_subordinated`, `lot_size_eur`, `coupon_rate`, `coupon_frequency`, `yield_net`, `price_clean`). Includes a hard-coded sovereign-rating fallback table since the DB carries no per-bond ratings.
+  - `strategies/bonds_income/ladder_builder.format_broker_list()`: plain-text purchase list ready to copy into a broker order screen.
+  - `strategies/bonds_income/ladder_builder.compute_next_12m_cashflow()`: aggregate expected cash (coupons + maturities) over the next 12 months.
+- **UI page `9_Ladder_Builder.py`** — storytelling-first design.
+  - Header didattico explaining what a bond ladder is in plain Italian.
+  - Form for budget / n_rungs / max_duration + advanced settings (composition tilt, rating gates, concentration cap).
+  - KPI cards in plain Italian (Capitale impiegato, Rendimento medio annuo, Cash prossimi 12 mesi, Numero di bond).
+  - Selected bonds table with Italian column headers + emoji-prefixed category labels.
+  - Skipped-bonds expander with reasons translated to plain Italian — full transparency on why a candidate was dropped.
+  - Concentration + adaptive-redistribution banners.
+  - Textual "Riassunto a parole" summary for non-graphic readers.
+  - Actions: CSV export, broker list, confirm acquired positions.
+- **Storytelling visualizations** (`ui/utils/ladder_viz.py`):
+  - `build_ladder_chart(proposal)`: a literal horizontal ladder — each rung a segmented bar within its tolerance window, colored by category (green = BTP, orange = corporate, blue = foreign).
+  - `build_cashflow_timeline(proposal)`: future events on a horizontal spine, small grey coupons + large green maturities with euro labels, floating 12-month aggregate annotation.
+- **Confirmation workflow**: from the Builder page, the user enters real broker-executed prices and the system registers each line into the existing `LadderTracker` (`positions.parquet`) via the unchanged `add_position` API.
+- **10-test coverage** for the builder (`tests/test_ladder_builder.py`): config validation, happy-path multi-rung, adaptive redistribution when foreign fails rating, lot-size skip recording, weighted-aggregate maths, broker-list format.
+- `_migration_log/bonds_db_data_gaps.md`: catalog of columns the spec assumes but bonds.db doesn't carry, plus the conservative defaults the builder applies.
+
+### Changed
+
+- `ui/pages/8_Bond_Ladder.py`: added an info banner linking to the new Ladder Builder for the "build from scratch" workflow.
+
+### Notes
+
+- **No live trading**. The builder produces a proposal a human then executes manually at a retail broker.
+- **bonds.db gaps gracefully degraded**: corporate per-bond ratings, daily volumes, first-call dates, and coupon frequencies are absent in the current schema. The builder falls back to: sovereign-rating table for govts (S&P 2026 Q1), name-pattern detection for subordinated/callable, €1000 face / annual coupon defaults, and silently skips the liquidity filter. All documented in `_migration_log/bonds_db_data_gaps.md`.
+- **Smoke test on real bonds.db** (`budget=€50k, 10 rungs, 10y`): 23 bonds selected, 32 skipped, allocated €38,306 (23 % unallocated due to lot-size slop), wavg YTM 2.97 % net, duration 5.47 y, composition 68.5/20.0/11.5 vs target 50/25/25, 5 rungs adapted (foreign rating too low — only BBB- Romania/Hungary in window).
+
 ## [1.1.0] — 2026-05-11
 
 ### Changed

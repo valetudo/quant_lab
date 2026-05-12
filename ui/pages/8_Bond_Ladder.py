@@ -30,6 +30,13 @@ st.set_page_config(page_title="Bond Ladder", page_icon="🏗️", layout="wide")
 st.title("🏗️ Bond Ladder Designer")
 st.caption("Track your bond ladder. Identify gaps. Suggest candidates. NOT a trading strategy.")
 
+st.info(
+    "💡 Vuoi **costruire un nuovo ladder da zero** invece di tracciare uno "
+    "esistente? Vai alla pagina **🏗️ Ladder Builder** dal menù laterale: "
+    "imposti budget + n° gradini + duration e ottieni una proposta concreta "
+    "di acquisto da portare al broker."
+)
+
 storage = get_storage()
 
 # Sidebar: ladder config

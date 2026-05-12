@@ -46,6 +46,7 @@ data_storage/portfolio/rebalance_log.jsonl
 *.duckdb.wal
 *.sqlite
 *.sqlite3
+*.db
 
 # Outputs / logs (regenerable from backtests + scripts)
 outputs/
