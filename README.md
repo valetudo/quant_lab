@@ -90,6 +90,18 @@ Windows shortcut: double-click `start.bat` (or `start.ps1` from PowerShell). The
 
 The **Backtest Lab** (was Backtest Runner) is in **🛠️ Strumenti** — only needed when validating an active alternative strategy.
 
+### Import from broker (Directa)
+
+Quant Lab supports drag-and-drop import of the standard Directa XLSX portfolio export:
+
+1. From the Directa portal: **Portafoglio → Esporta XLSX**.
+2. In Quant Lab: **📥 Aggiorna Posizioni** → tab **📤 Import da Broker (XLSX)** → drop the file.
+3. Type the cash balance (not included in the XLSX).
+4. Review the diff (new / updated / closed positions) and confirm which to sync.
+5. The page then shows a gap-analysis (current vs target allocation) with actionable suggestions.
+
+The pattern extends to any other broker that exports a structured file (Fineco CSV, IBKR XML, etc.) — the reconciliation engine is broker-agnostic.
+
 ## Configuration
 
 `configs/global.yaml` holds path defaults for the DuckDB cache and the bonds SQLite DB.

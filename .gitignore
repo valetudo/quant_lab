@@ -43,6 +43,7 @@ data_storage/bonds/positions.parquet
 data_storage/bonds/positions.csv
 data_storage/portfolio/rebalance_log.jsonl
 data_storage/positions/
+data_storage/imports/
 *.duckdb
 *.duckdb.wal
 *.sqlite

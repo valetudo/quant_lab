@@ -3,6 +3,58 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-05-12
+
+### Added
+
+- **Directa XLSX importer** — drag-and-drop import of the standard Directa
+  portfolio export (`P_TOTALE_<account>_<YYYYMMDD>.xlsx`). New tab
+  **📤 Import da Broker (XLSX)** as the first tab inside
+  `3_Aggiorna_Posizioni.py`.
+  - `core/data/importers/directa_xlsx.py` — `DirectaXLSXImporter` parser,
+    `DirectaPosition` + `DirectaPortfolioSnapshot` dataclasses, heuristic
+    bond/equity classifier (pattern match on instrument name + ISIN
+    prefix + Directa ticker shape).
+- **Reconciliation engine** — `portfolio/reconciliation.py` diffs the
+  broker snapshot against the active rows of the unified
+  `PositionTracker` and yields a `ReconciliationReport` with
+  `new` / `updated` / `closed` / `unchanged` deltas. `apply_deltas()`
+  materialises only the deltas the user checked in the data-editor.
+- **Gap analysis** — `ui/utils/gap_analysis.py` (`show_gap_analysis`,
+  `show_snapshot_summary`). Two side-by-side donut charts (current vs
+  target), a per-sleeve gap table, and actionable suggestions in plain
+  Italian ("Apri il Ladder Builder per generare proposta", "Apri Equity
+  — World ETF per acquistare VWCE", …).
+- **Manual cash-balance input** — Directa's XLSX excludes cash, so the
+  Import tab asks the user to type it after upload.
+- 9 new tests in `tests/test_directa_importer.py` (parser + reconciliation
+  edge cases, fixture-gated when the user's real export is present).
+
+### Architecture
+
+- **Broker-agnostic by design**: reconciliation diffs by ISIN; any future
+  importer (Fineco CSV, IBKR XML, …) that yields a snapshot of the same
+  shape plugs in without UI changes.
+- **`Position` quantity convention preserved**: Directa exports bond
+  `Quantita` as nominal EUR (matches v2.0.x convention), so the bond
+  value math `quantity × price / 100` keeps working unchanged.
+
+### Limitations
+
+- Purchase date is not in the Directa export → newly imported rows use
+  today's date.
+- Asset classification is heuristic; the reference fixture classifies
+  12/12 correctly, but edge-case instruments may fall through to
+  `"unknown"`. The UI flags any "unknown" in an expander and skips
+  them from the apply step.
+- `data_storage/imports/` is gitignored — uploaded broker files stay
+  local-only.
+
+### Reference
+
+- See `_migration_log/V2_1_0_DIRECTA_IMPORT.md` for the design rationale,
+  alternatives considered, and reference-run numbers.
+
 ## [2.0.1] — 2026-05-12
 
 Hotfix: three issues identified during v2.0.0 production use.

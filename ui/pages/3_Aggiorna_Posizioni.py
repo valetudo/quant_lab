@@ -22,19 +22,227 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 # ---
 
+from core.data.importers.directa_xlsx import import_directa_xlsx
 from portfolio.position_tracker import PositionTracker
 from portfolio.price_provider import PriceProvider
+from portfolio.reconciliation import apply_deltas, reconcile
+from ui.utils.gap_analysis import show_gap_analysis, show_snapshot_summary
 
 st.set_page_config(page_title="Aggiorna Posizioni", page_icon="📥", layout="wide")
 st.title("📥 Aggiorna posizioni esistenti")
 st.markdown(
-    "Inserisci, modifica o rimuovi bond e ETF posseduti. Il sistema "
-    "calcola la tua asset allocation attuale."
+    "Importa da broker, inserisci, modifica o rimuovi bond e ETF posseduti. "
+    "Il sistema calcola la tua asset allocation attuale."
 )
 
 tracker = PositionTracker()
 
-tab_b, tab_e, tab_a = st.tabs(["💰 Bonds", "🌍 Equity ETF", "🎯 Alternative"])
+tab_import, tab_b, tab_e, tab_a = st.tabs(
+    [
+        "📤 Import da Broker (XLSX)",
+        "💰 Bonds",
+        "🌍 Equity ETF",
+        "🎯 Alternative",
+    ]
+)
+
+
+# =========================================================
+# IMPORT TAB
+# =========================================================
+
+with tab_import:
+    st.subheader("📤 Importa da Directa")
+    st.markdown(
+        "Trascina qui il file Excel esportato da Directa "
+        "(`P_TOTALE_<account>_<YYYYMMDD>.xlsx`). Il sistema:\n"
+        "1. Legge le posizioni\n"
+        "2. Confronta con il portfolio attuale\n"
+        "3. Ti mostra cosa è **nuovo**, **cambiato** o **chiuso**\n"
+        "4. Tu decidi cosa sincronizzare"
+    )
+
+    uploaded = st.file_uploader(
+        "Carica file XLSX Directa",
+        type=["xlsx"],
+        help="Da Directa: Portafoglio → Esporta XLSX",
+        key="directa_uploader",
+    )
+
+    if uploaded is not None:
+        imports_dir = _PROJECT_ROOT / "data_storage" / "imports"
+        imports_dir.mkdir(parents=True, exist_ok=True)
+        save_path = (
+            imports_dir
+            / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded.name}"
+        )
+        with open(save_path, "wb") as f:
+            f.write(uploaded.getbuffer())
+
+        try:
+            snapshot = import_directa_xlsx(save_path)
+        except Exception as e:
+            st.error(f"❌ Errore nel parsing del file: {e}")
+            st.exception(e)
+            st.stop()
+
+        st.success(
+            f"✅ File parsato: **{len(snapshot.positions)} posizioni** trovate. "
+            f"Valore portfolio (escluso cash): €{snapshot.total_portfolio_value_eur:,.2f}"
+        )
+        st.caption(
+            f"Conto {snapshot.account} — {snapshot.account_holder} · "
+            f"estrazione {snapshot.extraction_date}"
+        )
+
+        st.markdown("---")
+        st.subheader("💵 Liquidità sul conto")
+        st.caption(
+            "Il file XLSX non include il saldo cash. Inseriscilo manualmente "
+            "(lo vedi nel pannello Directa, sezione 'Situazione patrimonio')."
+        )
+        cash_balance = st.number_input(
+            "Liquidità (€)",
+            min_value=0.0,
+            value=float(st.session_state.get("directa_cash", 0.0)),
+            step=100.0,
+            key="cash_balance_input",
+        )
+        st.session_state["directa_cash"] = cash_balance
+        snapshot.cash_balance_eur = cash_balance
+
+        # Flag any "unknown" classification for the user.
+        unknown = [p for p in snapshot.positions if p.asset_class == "unknown"]
+        if unknown:
+            with st.expander(
+                f"⚠️ {len(unknown)} posizioni non classificate (clicca per revisione)"
+            ):
+                st.caption(
+                    "Queste posizioni non corrispondono a nessun pattern noto "
+                    "(bond / equity). Verranno saltate dall'import. Aprile manualmente "
+                    "se vuoi tracciarle."
+                )
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "ISIN": p.isin,
+                                "Nome": p.name,
+                                "Ticker": p.ticker,
+                                "Quantità": p.quantity,
+                                "Valore": p.current_value_eur,
+                            }
+                            for p in unknown
+                        ]
+                    ),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+        st.markdown("---")
+        st.subheader("📋 Riepilogo dopo l'import")
+        show_snapshot_summary(snapshot)
+
+        report = reconcile(snapshot, tracker)
+
+        st.markdown("---")
+        st.subheader("🔄 Differenze rispetto al tracker attuale")
+
+        d1, d2, d3, d4 = st.columns(4)
+        d1.metric("🆕 Nuove", report.n_new)
+        d2.metric("📝 Modificate", report.n_updated)
+        d3.metric("🚫 Chiuse", report.n_closed)
+        d4.metric("✓ Invariate", report.n_unchanged)
+
+        for delta_type, emoji, label in [
+            ("new", "🆕", "Posizioni nuove"),
+            ("updated", "📝", "Posizioni modificate"),
+            ("closed", "🚫", "Posizioni chiuse (vendute o scadute)"),
+        ]:
+            relevant = report.by_type(delta_type)
+            if not relevant:
+                continue
+            with st.expander(
+                f"{emoji} {label} ({len(relevant)})", expanded=(delta_type == "new")
+            ):
+                rows: list[dict] = []
+                for d in relevant:
+                    if delta_type == "new" and d.directa_position is not None:
+                        rows.append(
+                            {
+                                "Seleziona": True,
+                                "ISIN": d.isin,
+                                "Nome": d.name,
+                                "Tipo": d.asset_class,
+                                "Quantità": d.directa_position.quantity,
+                                "Prezzo medio": d.directa_position.avg_purchase_price,
+                                "Valore €": d.directa_position.current_value_eur,
+                            }
+                        )
+                    elif delta_type == "updated":
+                        rows.append(
+                            {
+                                "Seleziona": True,
+                                "ISIN": d.isin,
+                                "Nome": d.name,
+                                "Quantità (vecchia → nuova)": (
+                                    f"{d.tracker_position.quantity:,.0f} → "
+                                    f"{d.new_quantity:,.0f}"
+                                ),
+                                "Prezzo medio (v → n)": (
+                                    f"{d.tracker_position.avg_purchase_price:.2f} → "
+                                    f"{d.new_avg_price:.2f}"
+                                ),
+                            }
+                        )
+                    elif delta_type == "closed":
+                        rows.append(
+                            {
+                                "Seleziona": True,
+                                "ISIN": d.isin,
+                                "Nome": d.name,
+                                "Quantità (tracker)": d.tracker_position.quantity,
+                                "Prezzo medio (tracker)": (
+                                    d.tracker_position.avg_purchase_price
+                                ),
+                            }
+                        )
+
+                edited = st.data_editor(
+                    pd.DataFrame(rows),
+                    key=f"editor_{delta_type}",
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                st.session_state[f"selections_{delta_type}"] = edited
+
+        st.markdown("---")
+        if st.button("✅ Applica modifiche selezionate", type="primary"):
+            user_choices: dict[str, bool] = {}
+            for delta_type in ("new", "updated", "closed"):
+                key = f"selections_{delta_type}"
+                if key in st.session_state:
+                    df_sel = st.session_state[key]
+                    for _, row in df_sel.iterrows():
+                        user_choices[row["ISIN"]] = bool(row["Seleziona"])
+
+            stats = apply_deltas(report, tracker, user_choices)
+            st.success(
+                f"✅ Sincronizzazione completata: "
+                f"**{stats['applied_new']} nuove**, "
+                f"**{stats['applied_updated']} aggiornate**, "
+                f"**{stats['applied_closed']} chiuse**, "
+                f"{stats['skipped']} saltate."
+            )
+
+            # Save snapshot for the gap-analysis block below.
+            st.session_state["last_import_snapshot"] = snapshot
+
+        # Gap analysis: show after import application (or whenever a snapshot exists).
+        snap_for_gap = st.session_state.get("last_import_snapshot") or snapshot
+        if snap_for_gap is not None:
+            st.markdown("---")
+            show_gap_analysis(snap_for_gap, key_prefix="import_gap")
 
 
 def _removal_ui(positions: list, label_fn, key_prefix: str) -> None:
