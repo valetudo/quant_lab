@@ -39,6 +39,10 @@ from strategies.bonds_income.ladder_builder import (
     compute_next_12m_cashflow,
     format_broker_list,
 )
+import time as _time
+
+from core.data.refresh_bonds import get_state as _get_refresh_state
+from ui.components.bonds_refresh_progress import render_refresh_panel
 from ui.utils.cache import get_storage
 from ui.utils.ladder_viz import build_cashflow_timeline, build_ladder_chart
 
@@ -51,45 +55,46 @@ st.caption(
 
 storage = get_storage()
 
-# ===== Bonds data freshness banner (shared by both tabs) =====
+# ===== Bonds data freshness banner + refresh panel (shared by both tabs) =====
 
 bonds_db = storage.bonds_db_path if hasattr(storage, "bonds_db_path") else None
-fs1, fs2 = st.columns([3, 1])
-with fs1:
-    if bonds_db and bonds_db.exists():
-        last_modified = pd.Timestamp.fromtimestamp(os.path.getmtime(bonds_db))
-        age_days = (pd.Timestamp.now() - last_modified).days
-        if age_days < 2:
-            st.success(
-                f"✅ Dati bonds aggiornati ({last_modified.strftime('%Y-%m-%d %H:%M')}, "
-                f"{age_days}g fa)"
-            )
-        elif age_days < 7:
-            st.info(
-                f"📅 Ultimo aggiornamento bonds: {age_days} giorni fa "
-                f"({last_modified.strftime('%Y-%m-%d')})"
-            )
-        else:
-            st.warning(
-                f"⚠️ Dati bonds stale: {age_days} giorni fa. "
-                f"Aggiorna per prezzi più recenti."
-            )
-    else:
-        st.error("❌ Database bonds non trovato. Aggiorna ora.")
-with fs2:
-    if st.button("🔄 Aggiorna prezzi bonds", help="Re-scrape Borsa Italiana"):
-        with st.spinner("Refresh in corso..."):
-            try:
-                from scripts.refresh_bonds_db import refresh_bonds_db
+_refresh_status = _get_refresh_state().status
 
-                stats = refresh_bonds_db(bonds_db)
-                if stats.get("status") == "scaffold":
-                    st.warning(f"⚠️ {stats['message']}")
-                else:
-                    st.success(f"✅ Aggiornati {stats.get('n_bonds', '?')} bond")
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Errore refresh: {e}")
+if _refresh_status == "idle":
+    # Compact layout: freshness banner left, "🔄 Aggiorna" button right.
+    fs1, fs2 = st.columns([3, 1])
+    with fs1:
+        if bonds_db and bonds_db.exists():
+            last_modified = pd.Timestamp.fromtimestamp(os.path.getmtime(bonds_db))
+            age_days = (pd.Timestamp.now() - last_modified).days
+            if age_days < 2:
+                st.success(
+                    f"✅ Dati bonds aggiornati "
+                    f"({last_modified.strftime('%Y-%m-%d %H:%M')}, {age_days}g fa)"
+                )
+            elif age_days < 7:
+                st.info(
+                    f"📅 Ultimo aggiornamento bonds: {age_days} giorni fa "
+                    f"({last_modified.strftime('%Y-%m-%d')})"
+                )
+            else:
+                st.warning(
+                    f"⚠️ Dati bonds stale: {age_days} giorni fa. "
+                    "Aggiorna per prezzi più recenti."
+                )
+        else:
+            st.error("❌ Database bonds non trovato. Aggiorna ora.")
+    with fs2:
+        _refresh_should_rerun = render_refresh_panel()
+else:
+    # Full-width layout: the refresh panel takes the whole row so the
+    # progress bar, metrics, and cancel button get the space they need.
+    _refresh_should_rerun = render_refresh_panel()
+
+# Auto-rerun while a refresh is in progress so the user sees live progress.
+if _refresh_should_rerun:
+    _time.sleep(2)
+    st.rerun()
 
 st.markdown("---")
 

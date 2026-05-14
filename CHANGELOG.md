@@ -3,6 +3,62 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] — 2026-05-14
+
+### Added
+
+- **Real bond DB refresh** via cross-repo integration with the `bonds/`
+  Selenium scraper (<https://github.com/valetudo/bonds>). Replaces the
+  v3.0.0 scaffold (which just copied the sister-repo DB) with an
+  in-process scrape that walks all 76 Borsa Italiana search profiles
+  and writes directly into Quant Lab's `bonds.db`.
+- **Progress UI** in `ui/components/bonds_refresh_progress.py`:
+  - Progress bar `profiles_completed / profiles_total` + percentage.
+  - Current profile label in Italian.
+  - Dynamic ETA computed from `elapsed_seconds / profiles_completed × remaining`.
+  - Live metrics: elapsed, ETA, bonds saved, profiles with errors.
+  - **❌ Annulla** button: sets a `threading.Event` that the scraper
+    polls via its `cancel_flag` argument.
+  - Toast notification + summary panel at completion.
+  - Retry / Dismiss buttons on failed/cancelled status.
+- **Background threading**: `core/data/refresh_bonds.py` runs the scrape
+  in a daemon thread so the UI never blocks. State persists in
+  `data_storage/bonds_refresh_state.json` (atomic writes via `.tmp` + rename).
+- **Sister-repo loader** `core/data/sister_repos.py`: resolves the
+  `bonds/` repo path via `$BONDS_REPO_PATH`, a Windows default, or a
+  sibling `../bonds/`, then dynamically imports `scraper` + `database`.
+
+### Architectural notes
+
+- **Schema is identical** between Quant Lab's bonds.db and the sister
+  repo's (Scenario A in the v3.0.1 brief). The sister repo's
+  `Database(path=...)` writes straight into Quant Lab's DB with no
+  adapter needed.
+- **Double-callback handling**: the scraper invokes `page_callback(stats)`
+  twice per profile (start + end). The backend tracks `in_progress_profiles`
+  in state to deduplicate; only the end-callback increments
+  `profiles_completed`. More robust than the spec's "saved>0 or error"
+  heuristic.
+- **Orphan-state recovery**: if the JSON says `running` but no worker
+  thread is alive and `started_at` is older than 30 min,
+  `get_state()` rewrites the state to `failed` so the UI doesn't stick.
+
+### Limitations
+
+- Full refresh takes ~5–10 min for 76 profiles on a normal connection.
+- Selenium can fail if Chrome is updated and webdriver-manager hasn't
+  caught up yet — the state transitions to `failed` with traceback in
+  the UI.
+
+### Backward compatibility
+
+100%: no Quant Lab API changed. The v2.1.0 `scripts/refresh_bonds_db.py`
+scaffold still works (and is useful for non-UI invocation); the UI just
+takes the new in-process path now.
+
+End-to-end test on 1 profile (Honduras, 1 bond): ✅ 12s, status=completed,
+bond saved correctly. 97/97 pytest tests still green.
+
 ## [3.0.0] — 2026-05-12
 
 ### MAJOR — Strategic simplification: back to research framework
