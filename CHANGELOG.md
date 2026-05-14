@@ -3,6 +3,67 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] — 2026-05-12
+
+### MAJOR — Strategic simplification: back to research framework
+
+Sidebar collapses from 10 voices to 4. Portfolio-management pages become
+hidden (URL-reachable, removed from sidebar). The system retreats to its
+core: research framework + decision tools, while the full portfolio
+workflow waits for broker-API integration.
+
+### Changed
+
+- **Sidebar to 4 voices** (was 10): 💰 Bond Ladder, 🌍 Equity, 🎯 Alternative, 🛠️ Strumenti.
+- **Default landing**: Bond Ladder (Home page archived).
+- **Equity page** simplified to pure informational guide — removed the
+  "Hai acquistato? Registra la posizione" form. Kept the VWCE banner,
+  rationale, comparison table, fiscal notes; added a "Filosofia" intro
+  explaining *why* passive global.
+- **Alternative page** rebuilt as a modular hub keyed off `StrategyRegistry`:
+  grouping by status (active / validated / scaffold / archived); per-strategy
+  detail view with three tabs (README / Configurazione / Backtest Lab).
+- **`ui/main.py`** rewritten: `st.Page(..., visibility="hidden")` for the
+  six demoted pages (Portfolio Overview, Costruisci Portfolio, Aggiorna
+  Posizioni, Backtest Lab, Bonds Screener, Data Status, Debug Logs). They
+  stay routable via direct URL but disappear from the sidebar.
+- **Strumenti page** rebuilt as minimalist container: three primary buttons
+  (Bonds Screener / Data Status / Debug Logs) + an expander exposing the
+  hidden portfolio-management pages + Backtest Lab.
+
+### Added
+
+- **`ui/components/mode_badge.py`** — small helper rendering colored
+  "Modalità ricerca" / "Portfolio management" / "Pagina nascosta" badges
+  at the top of pages, so the user instantly knows which mode they're in.
+- **Hidden-mode banner** on every demoted page (Portfolio Overview,
+  Costruisci, Aggiorna, Backtest Lab) explaining their v3 status and
+  pointing at future broker-API reactivation.
+
+### Removed (from primary nav, code preserved)
+
+- **Home page** archived to `ui/_archived/0_Home.py.bak`.
+
+### Backward compatibility
+
+100% preserved at the code/API level:
+- All backend APIs unchanged (PositionTracker, LadderTracker, LadderBuilder,
+  DirectaXLSXImporter, StrategyRegistry, PriceProvider).
+- All storage formats unchanged.
+- Hidden pages fully functional via direct URL (`/portfolio-overview`,
+  `/aggiorna-posizioni`, `/costruisci-portfolio`, `/backtest-lab`,
+  `/bonds-screener`, `/data-status`, `/debug-logs`).
+- 97/97 tests still green.
+
+### Reactivation
+
+When broker-API integration lands, restoring the v2.2.0 workflow takes
+~5 minutes: remove `visibility="hidden"` from the affected `st.Page`
+declarations in `ui/main.py`. No code to rewrite.
+
+See `_migration_log/V3_0_0_SIMPLIFICATION.md` for the full rationale,
+side-by-side nav comparison, and reactivation playbook.
+
 ## [2.2.0] — 2026-05-12
 
 Navigation overhaul: grouped sections in the sidebar via `st.navigation`,

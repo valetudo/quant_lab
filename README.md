@@ -71,36 +71,50 @@ streamlit run ui/main.py
 
 Windows shortcut: double-click `start.bat` (or `start.ps1` from PowerShell). The dashboard opens at <http://localhost:8501> and lands on the **🏠 Home** page.
 
-## Typical workflow
+## v3.0.0 — Research framework + decision tools
 
-### First time — build the portfolio from scratch
+The sidebar collapses to **four voices**:
 
-1. **🏠 Home** → "Costruisci portfolio da zero"
-2. **🏗️ Costruisci Portfolio** → pick your own asset allocation (e.g. 50/30/20)
-3. Build each section:
-   - **💰 Bonds** — Ladder Builder generates a concrete purchase proposal
-   - **🌍 Equity** — guided ETF selection (VWCE recommended)
-   - **🎯 Alternative** — explore active strategies (Pattern Finder + future)
+- 💰 **Bond Ladder** — design / track / generate proposals for the bond ladder (default landing).
+- 🌍 **Equity** — guida statica alla scelta dell'ETF passive globale (VWCE-first).
+- 🎯 **Alternative** — modular hub for active strategies + Backtest Lab integration.
+- 🛠️ **Strumenti** — Bonds Screener, Data Status, Debug Logs, plus the hidden pages.
 
-### Existing investor — track what you already own
+### Why "hidden pages"?
 
-1. **🏠 Home** → "Aggiorna posizioni esistenti"
-2. **📥 Aggiorna Posizioni** → enter bond + ETF holdings manually
-3. **📊 Portfolio Overview** → real-time P&L, allocation drift, per-asset detail
+The portfolio-management pages (Portfolio Overview, Costruisci Portfolio,
+Aggiorna Posizioni) and the legacy power-user pages (Backtest Lab, Bonds
+Screener, Data Status, Debug Logs) **still live in the code**, but they
+are registered with `visibility="hidden"` in `ui/main.py` so they don't
+appear in the sidebar. They are reachable via direct URL:
 
-The **Backtest Lab** (was Backtest Runner) is in **🛠️ Strumenti** — only needed when validating an active alternative strategy.
+```
+/portfolio-overview
+/costruisci-portfolio
+/aggiorna-posizioni
+/backtest-lab
+/bonds-screener
+/data-status
+/debug-logs
+```
 
-### Import from broker (Directa)
+…and via `st.switch_page` buttons from the four visible pages.
 
-Quant Lab supports drag-and-drop import of the standard Directa XLSX portfolio export:
+### When will the hidden pages come back?
 
-1. From the Directa portal: **Portafoglio → Esporta XLSX**.
-2. In Quant Lab: **📥 Aggiorna Posizioni** → tab **📤 Import da Broker (XLSX)** → drop the file.
-3. Type the cash balance (not included in the XLSX).
-4. Review the diff (new / updated / closed positions) and confirm which to sync.
-5. The page then shows a gap-analysis (current vs target allocation) with actionable suggestions.
+When the **broker-API integration** lands (Directa / IBKR). At that point
+the manual portfolio-management workflow becomes obsolete: positions
+sync automatically and the Overview/Aggiorna/Costruisci pages get
+reactivated on top of live broker data. Reactivation is a 5-minute edit
+to `ui/main.py` — no code to rewrite.
 
-The pattern extends to any other broker that exports a structured file (Fineco CSV, IBKR XML, etc.) — the reconciliation engine is broker-agnostic.
+### Import from broker (Directa) — still available
+
+The Directa XLSX import is wired into the hidden Aggiorna Posizioni page
+(`/aggiorna-posizioni`). The page works exactly as in v2.1.0/2.2.0; only
+its sidebar entry is gone.
+
+See `_migration_log/V3_0_0_SIMPLIFICATION.md` for the full rationale.
 
 ## Configuration
 

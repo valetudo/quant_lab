@@ -1,15 +1,19 @@
-"""Alternative Strategies — opportunistic sleeve management.
+"""Alternative — modular hub per le strategie attive (v3.0.0).
 
-Lists strategies registered for the opportunistic sleeve (auto-discovered
-via :class:`core.strategy.registry.StrategyRegistry`). For each strategy
-shows status, README link, and a button to either backtest it in the lab
-or register a position.
+Auto-discovers le strategie dal registry e le raggruppa per stato:
+
+- 🟢 active     — già deployate con capitale
+- 🔵 validated  — pronte per il deploy (walk-forward + benchmark passati)
+- 🟡 scaffold   — in sviluppo, non ancora validate
+- 🔴 archived   — validation fallita o performance degradata
+
+Click su "Esplora →" apre un dettaglio per strategia con README,
+configurazione e link al Backtest Lab (pagina hidden ma URL-reachable).
 """
 
 from __future__ import annotations
 
 import sys
-from datetime import date
 from pathlib import Path
 
 import streamlit as st
@@ -21,138 +25,189 @@ if str(_PROJECT_ROOT) not in sys.path:
 # ---
 
 from core.strategy.registry import StrategyRegistry
-from portfolio.position_tracker import PositionTracker
+from ui.components.mode_badge import mode_badge
 
 st.set_page_config(
     page_title="Alternative Strategies", page_icon="🎯", layout="wide"
 )
-st.title("🎯 Alternative Strategies")
-st.caption(
-    "Strategie attive per l'opportunistic sleeve. Validale prima di metterci "
-    "capitale reale: walk-forward + benchmark vs alternativa passiva."
+
+st.title("🎯 Alternative")
+mode_badge(
+    "ricerca",
+    "Hub per strategie alternative attive (short-term, intraday, event-driven). "
+    "Include backtest framework e walk-forward validation.",
 )
 
+# ----- intro -----
+
+st.markdown(
+    """
+Questa sezione ospita strategie attive da validare prima di un eventuale deploy
+con capitale reale. Ogni strategia **deve** passare:
+
+1. **Walk-forward** con OOS Sharpe stabile (median > 0.5, nessun fold con verdetto negativo).
+2. **Benchmark comparison** vs un'alternativa passiva rilevante (deve battere il passive).
+3. **Survivorship correction** se equity-based.
+
+> Lezione Quality Stocks V5 (archived): walk-forward passa, ma se benchmark
+> fallisce → archive. Non saltare nessuno dei due step.
+"""
+)
+
+# ----- registry-driven listing -----
+
 registry = StrategyRegistry()
-alt = registry.by_sleeve("opportunistic")
+all_strategies = list(registry.all())
 
-if not alt:
-    st.info(
-        "Nessuna strategia opportunistic registrata. Per aggiungerne una: "
-        "drop `strategies/<id>/strategy.py` + `config.yaml` e riavvia Streamlit. "
-        "Vedi `docs/adding_a_strategy.md`."
-    )
-    st.stop()
+# Filter to alternative / opportunistic only. We exclude the bonds + equity
+# sleeves: those have dedicated pages.
+alt_strategies = [
+    s for s in all_strategies if s.sleeve in ("opportunistic", "alternative")
+]
 
-STATUS_BADGE = {
-    "active": ("🟢", "Attiva"),
-    "scaffold": ("🟡", "Scaffold"),
-    "deprecated": ("⚫", "Archiviata"),
+# Group by status
+_GROUPS_ORDER = ("active", "validated", "scaffold", "archived")
+_STATUS_CFG = {
+    "active": {"emoji": "🟢", "label": "Attive (in produzione)"},
+    "validated": {"emoji": "🔵", "label": "Validate (pronte per deploy)"},
+    "scaffold": {"emoji": "🟡", "label": "Scaffold (in sviluppo)"},
+    "archived": {"emoji": "🔴", "label": "Archiviate (validation fallita)"},
 }
 
-for s in alt:
-    with st.container(border=True):
-        c1, c2, c3 = st.columns([3, 1, 1])
-        icon, label = STATUS_BADGE.get(s.status, ("⚪", s.status))
-        with c1:
-            st.markdown(f"### {icon} `{s.id}` — {label}")
-            if s.description:
-                st.caption(s.description)
-            st.markdown(f"**Path**: `{s.directory}`")
-        with c2:
-            st.metric("Status", s.status)
-        with c3:
-            st.metric("Sleeve", s.sleeve)
+groups: dict[str, list] = {k: [] for k in _GROUPS_ORDER}
+for s in alt_strategies:
+    groups.setdefault(s.status, []).append(s)
 
-        # Status-specific actions
-        if s.status == "scaffold":
-            st.warning(
-                "⚠️ Questa strategia è in stato **scaffold**: il codice è "
-                "abbozzato ma non ancora validato. Vedi il README della "
-                "strategia per i passi di attivazione."
-            )
-            if s.readme_path and Path(s.readme_path).exists():
-                with st.expander("📖 README"):
-                    try:
-                        st.markdown(
-                            Path(s.readme_path).read_text(encoding="utf-8")
-                        )
-                    except Exception as e:
-                        st.error(f"Non riesco a leggere il README: {e}")
+if not alt_strategies:
+    st.info(
+        "Nessuna strategia opportunistic registrata. Per aggiungerne una: "
+        "drop `strategies/<id>/strategy.py` + `config.yaml` con "
+        "`sleeve: opportunistic` e riavvia Streamlit."
+    )
 
-        elif s.status == "active":
-            col_a, col_b = st.columns(2)
-            with col_a:
+for status in _GROUPS_ORDER:
+    strategies = groups.get(status, [])
+    if not strategies:
+        continue
+    cfg = _STATUS_CFG.get(status, {"emoji": "⚪", "label": status})
+    st.markdown(f"### {cfg['emoji']} {cfg['label']}")
+    for s in strategies:
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([3, 1, 1])
+            with c1:
+                st.markdown(f"**`{s.id}`**")
+                if s.description:
+                    st.caption(s.description)
+                else:
+                    st.caption("_(nessuna descrizione nel config.yaml)_")
+            with c2:
+                st.metric("Sleeve", s.sleeve)
+            with c3:
                 if st.button(
-                    "🔬 Apri in Backtest Lab",
-                    key=f"bt_{s.id}",
+                    "Esplora →",
+                    key=f"explore_{s.id}",
                     use_container_width=True,
                 ):
-                    st.session_state["lab_strategy"] = s.id
-                    st.switch_page("pages/9_Backtest_Lab.py")
-            with col_b:
-                if st.button(
-                    "💼 Registra posizione",
-                    key=f"reg_{s.id}",
-                    use_container_width=True,
-                ):
-                    st.session_state["adding_position_strategy"] = s.id
-
-        elif s.status == "deprecated":
-            st.info(
-                "Questa strategia è stata archiviata. Vedi `_migration_log/` "
-                "per la decision history."
-            )
-
-        # Position registration form
-        if st.session_state.get("adding_position_strategy") == s.id:
-            with st.form(f"pos_form_{s.id}"):
-                st.markdown(f"**Registra posizione per `{s.id}`**")
-                pc1, pc2 = st.columns(2)
-                with pc1:
-                    amount = st.number_input(
-                        "Capitale impiegato (€)",
-                        min_value=100.0,
-                        step=100.0,
-                        value=5_000.0,
-                    )
-                with pc2:
-                    pdate = st.date_input("Data inizio", value=date.today())
-                submitted = st.form_submit_button("💾 Registra", type="primary")
-                if submitted:
-                    tr = PositionTracker()
-                    tr.add_alternative(
-                        strategy_id=s.id,
-                        name=f"{s.id} position",
-                        quantity=1,
-                        avg_purchase_price=float(amount),
-                        purchase_date=pdate,
-                    )
-                    st.success(
-                        f"✅ Posizione `{s.id}` registrata "
-                        f"(€{amount:,.0f} dal {pdate.isoformat()})."
-                    )
-                    st.session_state.pop("adding_position_strategy", None)
+                    st.session_state["exploring_strategy"] = s.id
                     st.rerun()
 
-st.markdown("---")
+# ----- strategy detail view -----
 
-with st.expander("➕ Aggiungere una nuova strategia"):
+if "exploring_strategy" in st.session_state:
+    strategy_id = st.session_state["exploring_strategy"]
+    strategy = next((s for s in alt_strategies if s.id == strategy_id), None)
+
+    if strategy is None:
+        st.error(f"Strategia non trovata nel registry: {strategy_id}")
+        if st.button("← Torna alla lista"):
+            st.session_state.pop("exploring_strategy", None)
+            st.rerun()
+    else:
+        st.markdown("---")
+        st.markdown(f"## 🔬 Dettaglio: `{strategy.id}`")
+        if st.button("← Torna alla lista", key="back_to_list"):
+            st.session_state.pop("exploring_strategy", None)
+            st.rerun()
+
+        tab_readme, tab_config, tab_backtest = st.tabs(
+            ["📖 README", "⚙️ Configurazione", "🔬 Backtest Lab"]
+        )
+
+        directory = Path(strategy.directory)
+
+        with tab_readme:
+            readme_path = (
+                Path(strategy.readme_path)
+                if strategy.readme_path
+                else directory / "README.md"
+            )
+            if readme_path.exists():
+                try:
+                    st.markdown(readme_path.read_text(encoding="utf-8"))
+                except Exception as e:
+                    st.error(f"Non riesco a leggere il README: {e}")
+            else:
+                st.info(f"Nessun README in `{directory}`.")
+
+        with tab_config:
+            config_path = directory / "config.yaml"
+            if config_path.exists():
+                try:
+                    st.code(config_path.read_text(encoding="utf-8"), language="yaml")
+                except Exception as e:
+                    st.error(f"Non riesco a leggere il config: {e}")
+            else:
+                st.info(f"Nessun config.yaml in `{directory}`.")
+
+        with tab_backtest:
+            st.markdown(
+                "Il **Backtest Lab** è una pagina dedicata con UI streaming "
+                "(equity curve live, walk-forward, benchmark comparison)."
+            )
+            st.caption(
+                "In v3.0.0 il Lab è hidden dalla nav primaria ma raggiungibile "
+                "via URL diretto `/backtest-lab`. Apri da qui con il bottone:"
+            )
+            if st.button(
+                f"🔬 Apri Backtest Lab per `{strategy.id}`",
+                type="primary",
+                key=f"bt_{strategy.id}",
+            ):
+                st.session_state["lab_strategy"] = strategy.id
+                st.switch_page("pages/9_Backtest_Lab.py")
+
+            if strategy.status == "scaffold":
+                st.warning(
+                    "⚠️ Strategia in stato **scaffold**: il codice è abbozzato ma "
+                    "non ancora validato. Vedi il README per i passi di attivazione."
+                )
+
+# ----- add new strategy guide -----
+
+st.markdown("---")
+with st.expander("➕ Come aggiungere una nuova strategia"):
     st.markdown(
         """
-Il framework è plug-and-play:
+Quant Lab è plug-and-play. Per aggiungere una strategia:
 
-1. Crea `strategies/<nome>/strategy.py` con classe che eredita da `Strategy`.
-2. Crea `strategies/<nome>/config.yaml` con `sleeve: opportunistic`.
-3. Riavvia Streamlit — la strategia viene auto-rilevata.
+1. **Crea** `strategies/<nome>/strategy.py` con classe che eredita da `Strategy`.
+2. **Crea** `strategies/<nome>/config.yaml` con `sleeve: opportunistic` + parametri.
+3. **Crea** `strategies/<nome>/README.md` con descrizione + tesi + validation plan.
+4. **Riavvia** Streamlit — la strategia viene auto-rilevata e appare qui.
 
 Guida completa: `docs/adding_a_strategy.md`.
 
-**Validation checklist** prima di promuovere a `status: active`:
-- ✅ Walk-forward 5+ fold con median OOS Sharpe > 0.2
-- ✅ Benchmark comparison vs alternativa passiva rilevante
-- ✅ Survivorship correction se equity-based
-- ✅ Paper trading 3+ mesi prima di deploy
+### Validation mandatory prima di `status: validated`
 
-Lezione di Quality Stocks V5 (archiviata): non saltare nessuno di questi passi.
+- Walk-forward 5+ fold con median OOS Sharpe > 0.5.
+- Benchmark vs alternativa passiva rilevante (deve battere).
+- Survivorship correction se equity-based.
+- Backtest su almeno 10 anni di dati.
+
+### Status transitions
+
+- `scaffold` → `validated`  passa walk-forward + benchmark.
+- `validated` → `active`    deploy con capitale reale + monitoring continuo.
+- qualsiasi → `archived`    validation fallita o performance degradata.
 """
     )

@@ -23,10 +23,17 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from portfolio.position_tracker import PositionTracker
 from portfolio.price_provider import PriceProvider
+from ui.components.mode_badge import mode_badge
 
 st.set_page_config(page_title="Portfolio Overview", page_icon="📊", layout="wide")
 
 st.title("📊 Portfolio Overview")
+mode_badge(
+    "hidden",
+    "Pagina hidden in v3.0.0: il portfolio management completo sarà riattivato "
+    "in futuro con l'integrazione API broker. Per ora funziona ma non è il "
+    "workflow operativo principale.",
+)
 st.caption("Performance reale delle tue posizioni attuali. Non è un backtest.")
 
 tracker = PositionTracker()

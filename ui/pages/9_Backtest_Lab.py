@@ -43,14 +43,21 @@ from ui.utils.streaming_runner import (
     start_live_run,
 )
 
+from ui.components.mode_badge import mode_badge
+
 st.set_page_config(page_title="Backtest Lab", page_icon="🔬", layout="wide")
 st.title("🔬 Backtest Lab")
+mode_badge(
+    "hidden",
+    "Pagina hidden in v3.0.0: aperta dall'interno di **🎯 Alternative → strategia "
+    "→ tab Backtest Lab**. Power-user; non in nav primaria.",
+)
 
 st.warning(
     "⚠️ **Backtest Lab è per strategie alternative attive.** Non usarlo per "
     "validare scelte passive (ETF World, bond ladder) — quelle sono decisioni "
     "strutturali, non statistiche. Per asset passivi vedi le pagine dedicate "
-    "(💰 Bonds — Ladder e 🌍 Equity — World ETF)."
+    "(💰 Bond Ladder e 🌍 Equity)."
 )
 
 storage = get_storage()

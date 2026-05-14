@@ -18,8 +18,15 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 # ---
 
+from ui.components.mode_badge import mode_badge
+
 st.set_page_config(page_title="Costruisci Portfolio", page_icon="🏗️", layout="wide")
 st.title("🏗️ Costruisci il tuo Portfolio")
+mode_badge(
+    "hidden",
+    "Pagina hidden in v3.0.0: il portfolio management completo sarà riattivato "
+    "in futuro con l'integrazione API broker.",
+)
 st.caption("Workflow guidato per nuovi investitori. Tre sezioni, una alla volta.")
 
 if "build_step" not in st.session_state:

@@ -26,10 +26,16 @@ from core.data.importers.directa_xlsx import import_directa_xlsx
 from portfolio.position_tracker import PositionTracker
 from portfolio.price_provider import PriceProvider
 from portfolio.reconciliation import apply_deltas, reconcile
+from ui.components.mode_badge import mode_badge
 from ui.utils.gap_analysis import show_gap_analysis, show_snapshot_summary
 
 st.set_page_config(page_title="Aggiorna Posizioni", page_icon="📥", layout="wide")
 st.title("📥 Aggiorna posizioni esistenti")
+mode_badge(
+    "hidden",
+    "Pagina hidden in v3.0.0: il portfolio management completo sarà riattivato "
+    "in futuro con l'integrazione API broker.",
+)
 st.markdown(
     "Importa da broker, inserisci, modifica o rimuovi bond e ETF posseduti. "
     "Il sistema calcola la tua asset allocation attuale."

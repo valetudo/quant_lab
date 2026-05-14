@@ -1,14 +1,13 @@
-"""Equity — World ETF selection guide.
+"""Equity — Guida alla scelta dell'ETF passive globale (v3.0.0).
 
-VWCE-first banner + comparison table + purchase form that writes into the
-unified PositionTracker. Includes fiscal notes for the Italian retail
-investor.
+Pura pagina informativa: VWCE-first banner, motivazione, comparison table,
+note fiscali. **No** form di registrazione posizioni — il portfolio
+management è temporaneamente fuori dalla nav (vedi v3.0.0 simplification).
 """
 
 from __future__ import annotations
 
 import sys
-from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -20,11 +19,35 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 # ---
 
-from portfolio.position_tracker import PositionTracker
+from ui.components.mode_badge import mode_badge
 
-st.set_page_config(page_title="Equity — World ETF", page_icon="🌍", layout="wide")
-st.title("🌍 Equity — World ETF")
-st.caption("Guida alla scelta dell'ETF globale ottimale per investitori italiani")
+st.set_page_config(page_title="Equity", page_icon="🌍", layout="wide")
+st.title("🌍 Equity")
+mode_badge(
+    "ricerca",
+    "Guida alla scelta dell'ETF passive globale. Non gestisce posizioni — "
+    "il portfolio management sarà integrato in futuro via API broker.",
+)
+
+# ----- filosofia -----
+
+st.markdown(
+    """
+## Filosofia
+
+L'equity sleeve di Quant Lab è **passiva e globale**. Non vale la pena attivare
+strategie complesse su questa parte del portfolio per due ragioni:
+
+1. **L'alpha estraibile da public US large-cap è zero/negativo** per il retail dopo
+   costi (lezione Quantopian + verdict Quality Stocks V5 vs SPY, archiviato in
+   `_migration_log/V5_VS_SPY_DECISION.md`).
+2. **Massima diversificazione + costo minimo** è la strategia ottimale dimostrata
+   empiricamente per orizzonti lungo termine (Fama-French, evidenza Bogleheads).
+
+L'ETF World UCITS è la realizzazione pratica di questa filosofia per investitori
+italiani.
+"""
+)
 
 # ----- big banner -----
 
@@ -138,61 +161,12 @@ st.dataframe(
 
 st.markdown("---")
 
-# ----- buy form -----
-
-st.subheader("💼 Hai acquistato? Registra la posizione")
-
-ETF_CATALOG = {
-    "VWCE (consigliato)": ("IE00BK5BQT80", "Vanguard FTSE All-World UCITS ETF (Acc)"),
-    "IWDA / SWDA": ("IE00B4L5Y983", "iShares Core MSCI World UCITS ETF (Acc)"),
-    "SPYY": ("IE00B3YLTY66", "SPDR MSCI ACWI UCITS ETF"),
-    "VUSA": ("IE00B3XXRP09", "Vanguard S&P 500 UCITS ETF (Dist)"),
-    "CSPX": ("IE00B5BMR087", "iShares Core S&P 500 UCITS ETF (Acc)"),
-}
-
-tracker = PositionTracker()
-
-with st.form("buy_etf_form"):
-    c1, c2 = st.columns(2)
-    with c1:
-        etf_choice = st.selectbox(
-            "ETF acquistato", list(ETF_CATALOG.keys()) + ["Altro"]
-        )
-        if etf_choice == "Altro":
-            isin = st.text_input("ISIN dell'ETF")
-            name = st.text_input("Nome ETF")
-        else:
-            isin, name = ETF_CATALOG[etf_choice]
-            st.text(f"ISIN: {isin}")
-            st.text(f"Nome: {name}")
-    with c2:
-        qty = st.number_input(
-            "Quote acquistate", min_value=1, step=1, value=100
-        )
-        avg_price = st.number_input(
-            "Prezzo medio acquisto (€/quota)",
-            min_value=0.01,
-            step=0.01,
-            value=120.0,
-            format="%.2f",
-        )
-        pdate = st.date_input("Data acquisto", value=date.today())
-
-    if st.form_submit_button("💾 Registra acquisto", type="primary"):
-        if not isin or not name:
-            st.error("ISIN e nome obbligatori.")
-        else:
-            tracker.add_equity(
-                isin=isin,
-                name=name,
-                quantity=qty,
-                avg_purchase_price=avg_price,
-                purchase_date=pdate,
-            )
-            st.success(f"✅ Registrate {qty} quote di {name}")
-            st.info(
-                "Vai a **📊 Portfolio Overview** per vedere il portfolio aggiornato."
-            )
+st.info(
+    "💡 **Vuoi tracciare i tuoi acquisti?** Il portfolio management completo "
+    "sarà integrato in futuro tramite API broker (Directa / IBKR). Per ora "
+    "questa pagina è puramente informativa: la guida finisce qui, la "
+    "decisione e l'esecuzione sono nelle tue mani."
+)
 
 st.markdown("---")
 
