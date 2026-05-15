@@ -722,19 +722,55 @@ La composizione complessiva è:
 # ----- actions -----
 
 st.markdown("---")
-st.subheader("🎯 Azioni")
-a1, a2, a3 = st.columns(3)
-with a1:
+st.subheader("📤 Esporta proposta")
+
+# Build the PDF once per render so the download is a single click.
+_pdf_bytes: bytes | None = None
+if not df.empty:
+    try:
+        from io import BytesIO
+
+        from reporting.ladder_pdf import generate_ladder_pdf
+
+        _pdf_buf = BytesIO()
+        generate_ladder_pdf(
+            proposal,
+            _pdf_buf,
+            build_borsa_url_fn=_borsa_italiana_url,
+        )
+        _pdf_bytes = _pdf_buf.getvalue()
+    except Exception as e:  # pragma: no cover - defensive
+        st.caption(f"⚠️ PDF non disponibile: {e}")
+
+e1, e2 = st.columns(2)
+with e1:
     csv = df.to_csv(index=False) if not df.empty else ""
     st.download_button(
         "📥 Esporta CSV",
         data=csv,
-        file_name=f"ladder_proposal_{date.today().isoformat()}.csv",
+        file_name=f"bond_ladder_{date.today().isoformat()}.csv",
         mime="text/csv",
         use_container_width=True,
         disabled=df.empty,
     )
-with a2:
+with e2:
+    st.download_button(
+        "📄 Esporta PDF",
+        data=_pdf_bytes if _pdf_bytes is not None else b"",
+        file_name=f"bond_ladder_{date.today().isoformat()}.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+        disabled=_pdf_bytes is None,
+        help=(
+            "PDF formattato: cover + grafico ladder + tabella bond con "
+            "link cliccabili a Borsa Italiana + note operative."
+        ),
+    )
+
+st.markdown("---")
+st.subheader("🎯 Azioni")
+a1, a2 = st.columns(2)
+with a1:
     if st.button(
         "📋 Lista per broker",
         use_container_width=True,
@@ -742,7 +778,7 @@ with a2:
         key="lb_broker_btn",
     ):
         st.session_state["show_broker_list"] = True
-with a3:
+with a2:
     if st.button(
         "✅ Conferma posizioni acquisite",
         type="primary",

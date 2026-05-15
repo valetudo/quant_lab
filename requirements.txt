@@ -19,6 +19,11 @@ tqdm==4.66.4
 streamlit==1.36.0
 plotly==5.22.0
 
+# PDF export (Bond Ladder → PDF). reportlab only — the chart is drawn
+# natively with reportlab.graphics, NOT via Plotly/kaleido (kaleido hangs
+# on Windows — see _migration_log/v320_kaleido_issue.md).
+reportlab==4.5.1
+
 # Scraping extras (selenium + headless chrome driver mgmt)
 selenium==4.21.0
 webdriver-manager==4.0.1

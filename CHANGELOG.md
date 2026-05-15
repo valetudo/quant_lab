@@ -3,6 +3,41 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] — 2026-05-15
+
+### Added
+
+- **PDF export of the Bond Ladder.** New "📄 Esporta PDF" button in the
+  Ladder Builder "📤 Esporta proposta" section, next to CSV export.
+  Generates a formatted 4–5 page A4 document:
+  - Cover: parameters, headline metrics, plain-Italian explanation.
+  - Chart: the ladder as native segmented horizontal bars + legend.
+  - Table: one bond per row, ISIN as a working hyperlink to its Borsa
+    Italiana scheda; zebra stripes; spills to extra pages if needed.
+  - Notes: operational steps + disclaimer.
+  - Filename `bond_ladder_YYYY-MM-DD.pdf`.
+- New module `reporting/ladder_pdf.py` (`generate_ladder_pdf`, accepts a
+  path or a `BytesIO`).
+- 4 new tests in `tests/test_ladder_pdf.py`.
+
+### Architecture
+
+- **`reportlab` only** — added to `requirements.txt`. The ladder chart
+  is drawn natively with `reportlab.graphics` primitives, **not** via
+  Plotly/kaleido: kaleido is unusable on Windows (1.3.0 API-incompatible
+  with plotly 5.22; 0.2.1 hangs `to_image()` indefinitely). The native
+  draw is faster, deterministic, and vector-quality. Full rationale in
+  `_migration_log/v320_kaleido_issue.md`.
+- The PDF uses only PDF core-14 fonts (Helvetica / Times-Roman) — no
+  Symbol-font glyphs, so it renders identically in every reader.
+
+### Backward compatibility
+
+100 %: new `reporting/` module, no existing API touched, ladder-builder
+backend unchanged. Test suite 102 → **106**.
+
+See `_migration_log/V3_2_0_PDF_EXPORT.md`.
+
 ## [3.1.5] — 2026-05-15
 
 Hotfix: Borsa Italiana scheda links were 404.
