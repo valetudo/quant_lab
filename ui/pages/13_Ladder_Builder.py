@@ -25,7 +25,9 @@ from strategies.bonds_income.ladder import LadderTracker
 from strategies.bonds_income.ladder_builder import (
     LadderBuilder,
     LadderBuilderConfig,
+    ParamCandidate,
     compute_next_12m_cashflow,
+    find_optimal_params,
     format_broker_list,
 )
 from ui.components.mode_badge import mode_badge
@@ -149,6 +151,117 @@ if abs(sum_w - 1.0) > 1e-6:
         f"⚠️ Le percentuali devono sommare al 100% — attuale: {sum_w * 100:.0f}%"
     )
     st.stop()
+
+
+# ----- optimal-params finder -----
+
+# Build a config snapshot from the current advanced settings so the finder
+# inherits user tweaks (composition weights, rating gates, etc.).
+def _current_base_config() -> LadderBuilderConfig:
+    return LadderBuilderConfig(
+        budget_eur=float(budget),
+        n_rungs=int(n_rungs_b),
+        max_duration_years=int(max_duration),
+        maturity_tolerance_months=int(tolerance_months),
+        gov_ita_weight=float(gov_ita_w),
+        corp_weight=float(corp_w),
+        gov_foreign_weight=float(gov_foreign_w),
+        foreign_min_rating=foreign_rating,
+        corp_min_rating=corp_rating,
+        corp_max_issuer_concentration_pct=float(max_concentration),
+    )
+
+
+finder_c1, finder_c2 = st.columns([1, 4])
+with finder_c1:
+    if st.button(
+        "🔍 Trova parametri ottimali",
+        key="lb_find_optimal",
+        help=(
+            "Scansiona ~30 combinazioni di (numero gradini, duration massima) "
+            "per il budget corrente e ti suggerisce le migliori per allocazione "
+            "totale. Tipicamente < 2 s. Non cambia subito i parametri — ti "
+            "mostra le opzioni, scegli tu."
+        ),
+    ):
+        with st.spinner("Esplorando combinazioni…"):
+            try:
+                st.session_state["lb_optimal_results"] = find_optimal_params(
+                    budget_eur=float(budget),
+                    base_config=_current_base_config(),
+                    top_n=5,
+                )
+            except Exception as e:
+                st.error(f"Errore nella scansione: {e}")
+
+with finder_c2:
+    st.caption(
+        "💡 *Suggerimento*: budget piccoli con duration alta lasciano spesso "
+        "molti gradini sotto-allocati. Clicca «Trova parametri ottimali» per "
+        "vedere automaticamente le combinazioni con miglior coverage."
+    )
+
+_optimal_results: list[ParamCandidate] = st.session_state.get(
+    "lb_optimal_results", []
+)
+if _optimal_results:
+    with st.container(border=True):
+        best = _optimal_results[0]
+        below_80 = best.coverage_pct < 80.0
+        if below_80:
+            st.warning(
+                f"⚠️ Per €{budget:,.0f} di budget nessuna combinazione "
+                f"raggiunge l'80% di coverage senza maximize_allocation. "
+                f"Migliore: **{best.coverage_pct:.1f}%**. Considera di "
+                f"aumentare il budget oppure attivare il toggle "
+                f"**🎯 Massimizza allocazione**."
+            )
+        else:
+            st.success(
+                f"✅ Trovate {len(_optimal_results)} combinazioni con "
+                f"coverage ≥ 80% per €{budget:,.0f}."
+            )
+
+        for idx, cand in enumerate(_optimal_results):
+            cols = st.columns([3, 1, 1, 1, 1])
+            badge = "🏆" if idx == 0 else f"#{idx + 1}"
+            with cols[0]:
+                st.markdown(
+                    f"**{badge}** · {cand.n_rungs} gradini · "
+                    f"max duration {cand.max_duration_years}y · "
+                    f"{cand.n_bonds_selected} bond"
+                )
+            cols[1].metric(
+                "Coverage",
+                f"{cand.coverage_pct:.1f}%",
+                delta=None,
+                delta_color="off",
+            )
+            cols[2].metric(
+                "YTM medio",
+                f"{cand.weighted_avg_ytm * 100:.2f}%",
+                delta=None,
+                delta_color="off",
+            )
+            cols[3].metric(
+                "Allocato",
+                f"€{cand.allocated_eur:,.0f}",
+                delta=None,
+                delta_color="off",
+            )
+            with cols[4]:
+                if st.button(
+                    "Usa questi",
+                    key=f"lb_apply_opt_{idx}",
+                    type=("primary" if idx == 0 else "secondary"),
+                ):
+                    # Pre-populate the number_input widgets via session_state.
+                    st.session_state["lb_n_rungs"] = cand.n_rungs
+                    st.session_state["lb_max_dur"] = cand.max_duration_years
+                    # Clear results so the panel collapses after apply.
+                    st.session_state.pop("lb_optimal_results", None)
+                    st.rerun()
+
 
 # ----- generate -----
 

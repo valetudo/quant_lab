@@ -945,3 +945,141 @@ def format_broker_list(proposal: LadderProposal) -> str:
         f"({proposal.total_unallocated_eur:,.0f}€ non allocati)"
     )
     return "\n".join(lines)
+
+
+# ---------- v3.1.2: optimal-params finder ----------
+
+
+@dataclass
+class ParamCandidate:
+    """A point in the (n_rungs × max_duration) grid + its scoring metrics.
+
+    The finder ranks candidates by ``coverage_pct`` (primary), then by
+    ``weighted_avg_ytm`` (tiebreaker). The UI displays the top N.
+    """
+
+    n_rungs: int
+    max_duration_years: int
+    coverage_pct: float  # 0..100
+    weighted_avg_ytm: float  # decimal
+    allocated_eur: float
+    n_bonds_selected: int
+
+
+# Reasonable defaults that cover the typical retail use cases (€10k–€500k,
+# 1–30 year horizon). Skewed to "moderate" combinations — extreme corners
+# (1 rung × 30 years, 30 rungs × 2 years) tend to score badly anyway.
+_DEFAULT_RUNG_GRID: tuple[int, ...] = (3, 5, 7, 10, 12, 15)
+_DEFAULT_DURATION_GRID: tuple[int, ...] = (5, 8, 10, 15, 20, 30)
+
+
+def find_optimal_params(
+    *,
+    budget_eur: float,
+    universe: Optional[pd.DataFrame] = None,
+    bonds_db_path: Optional[Path | str] = None,
+    base_config: Optional[LadderBuilderConfig] = None,
+    rungs_grid: tuple[int, ...] = _DEFAULT_RUNG_GRID,
+    duration_grid: tuple[int, ...] = _DEFAULT_DURATION_GRID,
+    top_n: int = 5,
+    min_coverage_pct: float = 80.0,
+) -> list[ParamCandidate]:
+    """Scan a grid of ``(n_rungs, max_duration_years)`` for ``budget_eur``
+    and return the best ``top_n`` candidates by coverage (with YTM as
+    tiebreaker).
+
+    The universe can be passed pre-loaded (recommended — saves ~0.1 s in
+    UI flows). When ``base_config`` is provided, all fields except
+    ``budget_eur``, ``n_rungs`` and ``max_duration_years`` are inherited
+    (so the user's "Impostazioni avanzate" still apply).
+
+    Filter logic:
+      1. Run every grid combination through ``LadderBuilder._build_standard``
+         (NOT the full ``build`` — the maximize fallbacks are off-topic
+         when comparing baseline configurations).
+      2. Keep candidates that meet ``min_coverage_pct``.
+      3. If none do, fall back to the top ``top_n`` regardless — the UI
+         flags this case so the user knows the budget is constrained.
+      4. Sort by (coverage desc, ytm desc) and take the top.
+    """
+    if universe is None:
+        loader = BondsUniverseLoader(bonds_db_path)
+        # Need a dummy config for the loader's currency / rating / etc.
+        tmp_cfg = base_config or LadderBuilderConfig(budget_eur=budget_eur)
+        universe = loader.load(tmp_cfg)
+
+    candidates: list[ParamCandidate] = []
+    for n_rungs in rungs_grid:
+        for max_dur in duration_grid:
+            # Skip ladder configurations that don't make physical sense
+            # (more rungs than years — would crowd buckets too thin).
+            if n_rungs > max_dur * 4:
+                continue
+            cfg = _clone_config(base_config, budget_eur, n_rungs, max_dur)
+            try:
+                builder = LadderBuilder(cfg, universe=universe)
+                proposal = builder._build_standard()
+            except Exception:
+                # Bad config combination — skip it.
+                continue
+            coverage = (
+                proposal.total_allocated_eur / proposal.total_target_eur * 100
+                if proposal.total_target_eur > 0
+                else 0.0
+            )
+            candidates.append(
+                ParamCandidate(
+                    n_rungs=n_rungs,
+                    max_duration_years=max_dur,
+                    coverage_pct=coverage,
+                    weighted_avg_ytm=proposal.weighted_avg_ytm,
+                    allocated_eur=proposal.total_allocated_eur,
+                    n_bonds_selected=proposal.n_bonds_selected,
+                )
+            )
+
+    if not candidates:
+        return []
+
+    above = [c for c in candidates if c.coverage_pct >= min_coverage_pct]
+    pool = above if above else candidates
+    pool.sort(key=lambda c: (-c.coverage_pct, -c.weighted_avg_ytm))
+    return pool[:top_n]
+
+
+def _clone_config(
+    base: Optional[LadderBuilderConfig],
+    budget_eur: float,
+    n_rungs: int,
+    max_duration_years: int,
+) -> LadderBuilderConfig:
+    """Make a new LadderBuilderConfig that inherits every advanced setting
+    from ``base`` (if provided) but overrides the three "primary" knobs.
+    """
+    if base is None:
+        return LadderBuilderConfig(
+            budget_eur=budget_eur,
+            n_rungs=n_rungs,
+            max_duration_years=max_duration_years,
+        )
+    return LadderBuilderConfig(
+        budget_eur=budget_eur,
+        n_rungs=n_rungs,
+        max_duration_years=max_duration_years,
+        gov_ita_weight=base.gov_ita_weight,
+        corp_weight=base.corp_weight,
+        gov_foreign_weight=base.gov_foreign_weight,
+        maturity_tolerance_months=base.maturity_tolerance_months,
+        foreign_yield_must_exceed_btp=base.foreign_yield_must_exceed_btp,
+        foreign_min_rating=base.foreign_min_rating,
+        foreign_min_daily_volume_eur=base.foreign_min_daily_volume_eur,
+        corp_min_rating=base.corp_min_rating,
+        corp_exclude_subordinated=base.corp_exclude_subordinated,
+        corp_exclude_callable_within_years=base.corp_exclude_callable_within_years,
+        corp_max_issuer_concentration_pct=base.corp_max_issuer_concentration_pct,
+        corp_currency=base.corp_currency,
+        ranking_metric=base.ranking_metric,
+        skip_if_lot_exceeds_budget=base.skip_if_lot_exceeds_budget,
+        # Intentionally NOT inheriting maximize_allocation — the finder
+        # always compares baselines (standard pass).
+    )

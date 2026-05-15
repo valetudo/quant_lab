@@ -3,6 +3,57 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.2] — 2026-05-15
+
+Auto-suggestion of optimal `(n_rungs, max_duration)` for a given budget.
+
+### Added
+
+- **`find_optimal_params()`** in `ladder_builder.py`: grid-search across
+  ~36 `(n_rungs, max_duration)` combinations using
+  `LadderBuilder._build_standard()` (no maximize fallbacks); returns
+  top N candidates sorted by coverage% (with YTM as tiebreaker). With a
+  pre-loaded universe the full grid runs in ~1 second.
+- **`ParamCandidate` dataclass**: a row of the search result with
+  `n_rungs`, `max_duration_years`, `coverage_pct`, `weighted_avg_ytm`,
+  `allocated_eur`, `n_bonds_selected`.
+- **"🔍 Trova parametri ottimali" button** on the Ladder Builder page,
+  next to the freshness banner. Shows the top-5 candidates in a bordered
+  container; each row has a metric strip + "Usa questi" button that
+  pre-populates `st.session_state["lb_n_rungs"]` /
+  `st.session_state["lb_max_dur"]` and reruns so the form picks up the
+  recommended values.
+- Coverage < 80% warning banner: when no combination meets the threshold,
+  the user is told the budget is the bottleneck and pointed at the
+  `🎯 Massimizza allocazione` toggle.
+
+### Architectural notes
+
+- The finder inherits the user's advanced settings (composition weights,
+  rating gates, concentration cap) from a `base_config` parameter — only
+  budget/n_rungs/duration vary in the grid. Settings tweaked manually
+  stay applied.
+- Skips combinations with `n_rungs > max_duration * 4` (too crowded to
+  spread bonds across).
+
+### Reference run
+
+For the screenshotted scenario (€20k):
+
+| Setup | Coverage | YTM | Allocated |
+|---|---:|---:|---:|
+| Form default (5 / 30y) | 70.8 % | 3.47 % | €14,161 |
+| Form default (3 / 30y) | 54.8 % | 3.66 % | €10,958 |
+| **Recommended (5 / 15y)** | **93.0 %** | **3.21 %** | **€18,605** |
+
+### Backward compatibility
+
+- No existing API or storage changed.
+- Default behaviour unchanged: the button is opt-in.
+- 100 → **102** tests (2 new for `find_optimal_params`, 0 broken).
+
+See `_migration_log/V3_1_2_OPTIMAL_PARAMS.md`.
+
 ## [3.1.1] — 2026-05-15
 
 Ladder Builder refinements based on three user-feedback items.
