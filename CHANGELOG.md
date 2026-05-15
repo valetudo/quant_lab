@@ -3,6 +3,33 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.5] — 2026-05-15
+
+Hotfix: Borsa Italiana scheda links were 404.
+
+### Fixed
+
+- **"🔗 Apri scheda" links returned 404.** The URL pattern shipped in
+  v3.1.1 — `borsaitaliana.it/borsa/cerca-titolo.html?search=<ISIN>` —
+  was guessed, not verified; that endpoint doesn't exist.
+- Fix: use the verified structured pattern
+  `/borsa/obbligazioni/mot/<categoria>/scheda/<ISIN>.html?lang=it`,
+  where `<categoria>` is inferred from the instrument name:
+  - Italian sovereigns (BTP / BOT / CCT / CTZ) → `btp`
+  - everything else (foreign sovereigns + corporates) → `obbligazioni-euro`
+- Added a **second link column "🔍 Cerca"** — a `site:borsaitaliana.it`
+  web search that always resolves, as a fallback for bonds whose BI
+  sub-category can't be reliably inferred (some corporates).
+
+### Tested
+
+- URL builder verified on BTP / Romania / Carraro / USA-Treasury samples.
+- AppTest: 0 exceptions; 15/15 ladder-builder tests verdi.
+
+### Backward compatibility
+
+100 %: only the Ladder Builder link table changed.
+
 ## [3.1.4] — 2026-05-15
 
 Hotfix: "Usa questi" now renders the ladder immediately.

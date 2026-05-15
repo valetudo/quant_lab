@@ -496,21 +496,52 @@ st.plotly_chart(build_cashflow_timeline(proposal), use_container_width=True)
 # ----- Borsa Italiana link table -----
 
 
-def _borsa_italiana_url(isin: str) -> str:
-    """Build a search URL for the BI catalog page of an ISIN.
+def _borsa_italiana_url(isin: str, bond_name: str = "") -> str:
+    """Build the Borsa Italiana scheda URL for a bond.
 
-    The search endpoint is independent of the listing market (MOT vs
-    EuroTLX) so this works for every bond in the catalog regardless of
-    whether bonds.db tracks the market column.
+    Verified pattern (v3.1.5):
+        /borsa/obbligazioni/mot/<categoria>/scheda/<ISIN>.html?lang=it
+
+    ``<categoria>`` is inferred from the instrument name:
+      - Italian sovereigns (BTP / BOT / CCT / CTZ) → ``btp``
+      - everything else (foreign sovereigns + corporates) →
+        ``obbligazioni-euro``
+
+    The old v3.1.1 endpoint ``cerca-titolo.html?search=`` returned 404 —
+    it never existed. For bonds whose category can't be guessed
+    reliably, :func:`_borsa_italiana_fallback_url` gives a web-search
+    link that always resolves.
     """
-    return f"https://www.borsaitaliana.it/borsa/cerca-titolo.html?search={isin}"
+    isin = (isin or "").upper().strip()
+    name_upper = (bond_name or "").upper()
+    italian_sov = ("BTP", "BOT", "CCT", "CTZ")
+    if any(tok in name_upper for tok in italian_sov):
+        categoria = "btp"
+    else:
+        categoria = "obbligazioni-euro"
+    return (
+        f"https://www.borsaitaliana.it/borsa/obbligazioni/mot/"
+        f"{categoria}/scheda/{isin}.html?lang=it"
+    )
+
+
+def _borsa_italiana_fallback_url(isin: str) -> str:
+    """Web-search fallback — always resolves.
+
+    Used as the second link column for bonds whose BI sub-category can't
+    be inferred from the name (e.g. some corporates). A Google search
+    scoped to ``site:borsaitaliana.it`` lands on the right scheda.
+    """
+    isin = (isin or "").upper().strip()
+    return f"https://www.google.com/search?q=site%3Aborsaitaliana.it+{isin}"
 
 
 st.subheader("🔗 Apri scheda Borsa Italiana")
 st.caption(
-    "Tabella compatta con link diretto alla scheda ufficiale del bond "
-    "(prezzi, prospetto, dati storici). Click su **Apri scheda** apre la "
-    "pagina in una nuova tab del browser."
+    "Click su **🔗 Scheda** per la pagina ufficiale Borsa Italiana del bond "
+    "(prezzi, prospetto, dati storici). Se il link non funziona "
+    "(categorizzazione errata per alcuni corporate), usa **🔍 Cerca** per "
+    "trovare la scheda tramite ricerca web."
 )
 
 _link_rows: list[dict] = []
@@ -529,7 +560,8 @@ for _rung in proposal.rungs:
                 "ISIN": _bond.isin,
                 "Capitale €": _bond.amount_eur,
                 "YTM %": _bond.ytm_net * 100,
-                "🔗 Borsa Italiana": _borsa_italiana_url(_bond.isin),
+                "🔗 Scheda": _borsa_italiana_url(_bond.isin, _bond.name),
+                "🔍 Cerca": _borsa_italiana_fallback_url(_bond.isin),
             }
         )
 
@@ -547,9 +579,13 @@ if _link_rows:
                 "Capitale", format="€%.0f"
             ),
             "YTM %": st.column_config.NumberColumn("YTM", format="%.2f%%"),
-            "🔗 Borsa Italiana": st.column_config.LinkColumn(
-                "🔗 Borsa Italiana",
-                display_text="Apri scheda",
+            "🔗 Scheda": st.column_config.LinkColumn(
+                "🔗 Scheda",
+                display_text="Apri",
+            ),
+            "🔍 Cerca": st.column_config.LinkColumn(
+                "🔍 Cerca",
+                display_text="Search",
             ),
         },
         hide_index=True,
