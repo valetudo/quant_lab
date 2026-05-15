@@ -1,22 +1,22 @@
-"""Quant Lab — main entry (v3.0.0 simplification).
+"""Quant Lab — main entry (v3.1.0 bonds simplification).
 
-Sidebar collapses to 4 voices:
+Sidebar collapses further from v3.0.0's 4 voices to a new set of 4:
 
 ```
-💰 Bond Ladder       (default landing)
+💰 Bonds          (default landing — was Bonds Screener + refresh)
+🏗️ Ladder Builder (extracted from the old Bond Ladder unified page)
 🌍 Equity
 🎯 Alternative
-🛠️ Strumenti
 ```
 
-Portfolio-management pages (Portfolio Overview, Aggiorna Posizioni,
-Costruisci Portfolio) are registered with ``visibility="hidden"`` —
-they stay reachable via direct URL but disappear from the sidebar.
-This is reversible: when the broker-API integration lands, flip
-``visibility`` back to ``"visible"`` and the workflow is restored.
+The old "Bond Ladder & Builder" unified page (with tabs Tracker + Builder)
+is archived. The Tracker tab content went away entirely (no portfolio
+management active in v3.x); the Builder tab became its own page.
 
-The Backtest Lab also stays hidden but reachable; the Alternative
-hub provides a one-click link per strategy.
+Portfolio-management pages (Portfolio Overview, Aggiorna Posizioni,
+Costruisci Portfolio) plus the diagnostic pages (Backtest Lab, Data
+Status, Debug Logs) keep ``visibility="hidden"`` so they stay
+reachable via direct URL but disappear from the sidebar.
 """
 
 from __future__ import annotations
@@ -35,11 +35,17 @@ import streamlit as st
 
 # ---------- visible pages (the 4-voice sidebar) ----------
 
-bond_ladder = st.Page(
-    "pages/4_Bonds_Ladder.py",
-    title="Bond Ladder",
+bonds = st.Page(
+    "pages/4_Bonds.py",
+    title="Bonds",
     icon="💰",
     default=True,
+)
+
+ladder_builder = st.Page(
+    "pages/13_Ladder_Builder.py",
+    title="Ladder Builder",
+    icon="🏗️",
 )
 
 equity = st.Page(
@@ -52,12 +58,6 @@ alternative = st.Page(
     "pages/6_Alternative_Strategies.py",
     title="Alternative",
     icon="🎯",
-)
-
-strumenti = st.Page(
-    "pages/7_Strumenti.py",
-    title="Strumenti",
-    icon="🛠️",
 )
 
 
@@ -95,14 +95,6 @@ hidden_backtest_lab = st.Page(
     visibility="hidden",
 )
 
-hidden_bonds_screener = st.Page(
-    "pages/10_Bonds_Screener.py",
-    title="Bonds Screener",
-    icon="🔍",
-    url_path="bonds-screener",
-    visibility="hidden",
-)
-
 hidden_data_status = st.Page(
     "pages/11_Data_Status.py",
     title="Data Status",
@@ -124,16 +116,15 @@ hidden_debug_logs = st.Page(
 
 pg = st.navigation(
     [
-        bond_ladder,
+        bonds,
+        ladder_builder,
         equity,
         alternative,
-        strumenti,
-        # Hidden pages are passed in too so st.switch_page can target them.
+        # Hidden — kept in nav for st.switch_page targeting + URL routing.
         hidden_portfolio_overview,
         hidden_costruisci,
         hidden_aggiorna,
         hidden_backtest_lab,
-        hidden_bonds_screener,
         hidden_data_status,
         hidden_debug_logs,
     ]
@@ -145,7 +136,7 @@ pg = st.navigation(
 with st.sidebar:
     st.markdown("---")
     st.caption(
-        "**Quant Lab v3.0.0**  \n"
+        "**Quant Lab v3.1.0**  \n"
         "Research framework + decision tools.  \n"
         "Portfolio management via broker API: TBD."
     )

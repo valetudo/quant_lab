@@ -3,6 +3,55 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] — 2026-05-15
+
+### Changed
+
+- **Sidebar reorganized** — still 4 voices, but different:
+  - **💰 Bonds** (was Bond Ladder & Builder unified): now hosts the
+    Screener (filters, table, yield-curve chart) plus the v3.0.1
+    freshness banner + refresh panel at the top.
+  - **🏗️ Ladder Builder** — extracted as its own page from the old
+    `4_Bonds_Ladder.py` Builder tab. Content identical.
+  - **🌍 Equity** — unchanged.
+  - **🎯 Alternative** — unchanged.
+- **Default landing**: Bonds (was Bond Ladder).
+
+### Removed (from navigation)
+
+- **Bond Ladder unified page** (`4_Bonds_Ladder.py`) — archived to
+  `ui/_archived/4_Bonds_Ladder.py.v310.bak`. Tab Tracker content
+  retired entirely (no portfolio management active in v3.x); tab
+  Builder content moved to the new Ladder Builder page.
+- **Strumenti hub** (`7_Strumenti.py`) — archived. Function redundant
+  now that the diagnostic pages (Backtest Lab, Data Status, Debug
+  Logs) are still URL-accessible.
+- **Bonds Screener standalone** (`10_Bonds_Screener.py`) — archived.
+  Content migrated into the new `4_Bonds.py`.
+
+### Hidden (still URL-accessible)
+
+Same set as v3.0.0: `/portfolio-overview`, `/costruisci-portfolio`,
+`/aggiorna-posizioni`, `/backtest-lab`, `/data-status`, `/debug-logs`.
+
+### Backward compatibility
+
+100% at the code/API level:
+- All backend APIs unchanged (LadderTracker, LadderBuilder,
+  PositionTracker, refresh worker, sister-repo importer).
+- All storage formats unchanged.
+- 97/97 tests still green; 11/11 URL routes serve HTTP 200.
+
+### Philosophy
+
+Continuation of v3.0.0's "build what you'll actually use" trend.
+Four pages, each independent and each useful: explore the bond
+catalog, plan a new ladder, pick a passive equity ETF, explore
+short-term strategies. No daily portfolio management — that waits
+for broker-API integration.
+
+See `_migration_log/V3_1_0_BONDS_SIMPLIFICATION.md` for full rationale.
+
 ## [3.0.1] — 2026-05-14
 
 ### Added
