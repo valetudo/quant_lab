@@ -123,6 +123,26 @@ with st.expander("⚙️ Impostazioni avanzate", expanded=False):
             key="lb_mc",
         )
 
+    st.markdown("---")
+    st.markdown("**Strategia di allocazione**")
+    maximize_allocation = st.checkbox(
+        "🎯 Massimizza allocazione",
+        value=False,
+        key="lb_maximize",
+        help=(
+            "Quando attivo, il builder cerca di allocare il 100 % del budget "
+            "anche se questo significa:\n"
+            "- Espandere la tolerance window di scadenza (es. ±12 mesi invece di ±6, "
+            "fino a ±24 mesi)\n"
+            "- Ridistribuire l'eventuale residuo non allocato sui gradini con più "
+            "capacity\n\n"
+            "Trade-off: leggera variazione del rendimento medio "
+            "(tipicamente ±0.1–0.3 pp), in cambio di allocazione completa.\n\n"
+            "Default OFF: comportamento standard, può lasciare residuo se i "
+            "vincoli sono stretti."
+        ),
+    )
+
 sum_w = gov_ita_w + corp_w + gov_foreign_w
 if abs(sum_w - 1.0) > 1e-6:
     st.error(
@@ -146,6 +166,7 @@ if st.button("🔨 Genera proposta ladder", type="primary", key="lb_generate"):
                 foreign_min_rating=foreign_rating,
                 corp_min_rating=corp_rating,
                 corp_max_issuer_concentration_pct=float(max_concentration),
+                maximize_allocation=bool(maximize_allocation),
             )
             proposal = LadderBuilder(bcfg).build()
             st.session_state["ladder_proposal"] = proposal
@@ -216,15 +237,179 @@ if adapted_count > 0:
     )
 
 if proposal.concentration_warnings:
-    st.warning(
-        "⚠️ **Concentrazioni emittenti oltre il limite:**\n"
-        + "\n".join(f"- {w}" for w in proposal.concentration_warnings)
+    _SOFT_LIMIT_PCT = proposal.config.corp_max_issuer_concentration_pct
+
+    def _parse_excess(w: str) -> tuple[str, float]:
+        """Extract (issuer, pct) from 'Obligaciones Fx: 5.3% > limite 5%'."""
+        try:
+            issuer = w.split(":", 1)[0].strip()
+            pct = float(w.split(":", 1)[1].split("%", 1)[0].strip())
+            return issuer, pct
+        except (IndexError, ValueError):
+            return w, _SOFT_LIMIT_PCT
+
+    parsed = [_parse_excess(w) for w in proposal.concentration_warnings]
+    max_excess_pp = max((p - _SOFT_LIMIT_PCT for _, p in parsed), default=0.0)
+
+    with st.container(border=True):
+        hcol1, hcol2 = st.columns([10, 1])
+        with hcol1:
+            st.markdown(
+                "### ⚠️ Concentrazione singolo emittente sopra raccomandazione"
+            )
+        with hcol2:
+            st.markdown(
+                "ℹ️",
+                help=(
+                    "Per diversificazione del rischio credito, si raccomanda di "
+                    f"non superare il {_SOFT_LIMIT_PCT:.0f}% del budget per singolo "
+                    "emittente corporate.\n\n"
+                    "Se un emittente fallisce, perdere il 5% del portfolio è "
+                    "doloroso ma gestibile; perdere il 15% è catastrofico.\n\n"
+                    "Sforamenti minimi (< 2 pp) sono accettabili. Sforamenti "
+                    "significativi richiedono di ridurre la posizione "
+                    "manualmente o aumentare budget/gradini."
+                ),
+            )
+        st.markdown(
+            "Per diversificazione del rischio credito, si raccomanda di non "
+            f"superare il **{_SOFT_LIMIT_PCT:.0f}%** del budget per singolo "
+            "emittente corporate. Nella tua ladder:"
+        )
+        for issuer, pct in parsed:
+            excess = pct - _SOFT_LIMIT_PCT
+            severity = "minimo" if excess < 2.0 else "significativo"
+            st.markdown(
+                f"- **{issuer}**: {pct:.1f}% del capitale allocato "
+                f"(raccomandato: max {_SOFT_LIMIT_PCT:.0f}%, sforamento {severity})"
+            )
+        if max_excess_pp < 2.0:
+            st.info(
+                "ℹ️ Questi sforamenti sono minimi e accettabili. Per essere più "
+                "stretto, riduci il budget per il singolo emittente o aumenta il "
+                "numero di gradini per diluire la posizione."
+            )
+        else:
+            st.warning(
+                "⚠️ Sforamenti significativi. Considera di ribilanciare "
+                "manualmente vendendo parte delle posizioni concentrate, oppure "
+                "rigenera la proposta con vincoli più stretti (più gradini, "
+                "budget più alto)."
+            )
+
+# ----- maximize-allocation info banner -----
+
+if proposal.config.maximize_allocation:
+    yield_now = proposal.weighted_avg_ytm
+    yield_before = proposal.yield_without_maximization
+    alloc_pct = (
+        proposal.total_allocated_eur / proposal.total_target_eur * 100
+        if proposal.total_target_eur > 0
+        else 0
     )
+    if yield_before is not None and abs(yield_now - yield_before) > 1e-6:
+        diff_pp = (yield_now - yield_before) * 100
+        st.info(
+            f"📊 **Massimizzazione allocazione attiva** — rendimento medio "
+            f"**{yield_now * 100:.2f}%** (senza massimizzazione: "
+            f"{yield_before * 100:.2f}%, impatto {diff_pp:+.2f} pp). "
+            f"Allocato €{proposal.total_allocated_eur:,.0f} di "
+            f"€{proposal.total_target_eur:,.0f} ({alloc_pct:.1f} %)."
+        )
+    else:
+        st.info(
+            f"📊 **Massimizzazione allocazione attiva** — non sono stati "
+            f"trovati bond aggiuntivi per i gradini sotto-allocati. "
+            f"Allocato €{proposal.total_allocated_eur:,.0f} di "
+            f"€{proposal.total_target_eur:,.0f} ({alloc_pct:.1f} %)."
+        )
+
+# ----- allocation log -----
+
+if proposal.allocation_log:
+    with st.expander(
+        "📋 Log dettagliato del processo di allocazione", expanded=False
+    ):
+        st.caption(
+            "Traccia step-by-step di come il builder ha allocato il budget. "
+            "Utile per capire perché certi gradini sono sotto-allocati o "
+            "perché certi bond sono stati scartati."
+        )
+        for entry in proposal.allocation_log:
+            if entry.startswith("Step"):
+                st.markdown(f"**{entry}**")
+            else:
+                st.markdown(entry)
 
 # ----- charts -----
 
 st.plotly_chart(build_ladder_chart(proposal), use_container_width=True)
 st.plotly_chart(build_cashflow_timeline(proposal), use_container_width=True)
+
+
+# ----- Borsa Italiana link table -----
+
+
+def _borsa_italiana_url(isin: str) -> str:
+    """Build a search URL for the BI catalog page of an ISIN.
+
+    The search endpoint is independent of the listing market (MOT vs
+    EuroTLX) so this works for every bond in the catalog regardless of
+    whether bonds.db tracks the market column.
+    """
+    return f"https://www.borsaitaliana.it/borsa/cerca-titolo.html?search={isin}"
+
+
+st.subheader("🔗 Apri scheda Borsa Italiana")
+st.caption(
+    "Tabella compatta con link diretto alla scheda ufficiale del bond "
+    "(prezzi, prospetto, dati storici). Click su **Apri scheda** apre la "
+    "pagina in una nuova tab del browser."
+)
+
+_link_rows: list[dict] = []
+for _rung in proposal.rungs:
+    for _category, _bond in _rung.selected_bonds.items():
+        if _bond is None:
+            continue
+        _emoji = {"gov_ita": "🇮🇹", "corp": "🏢", "gov_foreign": "🌍"}.get(
+            _category, "•"
+        )
+        _link_rows.append(
+            {
+                "Gradino": _rung.rung_index + 1,
+                "Tipo": _emoji,
+                "Bond": _bond.name,
+                "ISIN": _bond.isin,
+                "Capitale €": _bond.amount_eur,
+                "YTM %": _bond.ytm_net * 100,
+                "🔗 Borsa Italiana": _borsa_italiana_url(_bond.isin),
+            }
+        )
+
+if _link_rows:
+    st.dataframe(
+        pd.DataFrame(_link_rows),
+        column_config={
+            "Gradino": st.column_config.NumberColumn(
+                "Gradino", width="small", format="%d"
+            ),
+            "Tipo": st.column_config.TextColumn("Tipo", width="small"),
+            "Bond": st.column_config.TextColumn("Nome", width="large"),
+            "ISIN": st.column_config.TextColumn("ISIN", width="medium"),
+            "Capitale €": st.column_config.NumberColumn(
+                "Capitale", format="€%.0f"
+            ),
+            "YTM %": st.column_config.NumberColumn("YTM", format="%.2f%%"),
+            "🔗 Borsa Italiana": st.column_config.LinkColumn(
+                "🔗 Borsa Italiana",
+                display_text="Apri scheda",
+            ),
+        },
+        hide_index=True,
+        use_container_width=True,
+    )
+
 
 # ----- table -----
 

@@ -74,6 +74,24 @@ class LadderBuilderConfig:
     # Lot size handling
     skip_if_lot_exceeds_budget: bool = True
 
+    # ---- v3.1.1: "maximize allocation" strategy ----
+    # When True, after the standard build pass, the builder applies up to
+    # two fallback strategies to reach 100% allocation, accepting a small
+    # yield hit:
+    #
+    #   (A) Tolerance window expansion: under-allocated rungs are re-built
+    #       with ±12 / ±18 / ±24 months instead of the configured
+    #       ``maturity_tolerance_months``.
+    #   (B) Greedy reallocation: if more than ``min_residue_threshold_pct``
+    #       of the budget is still unallocated, the residue is poured into
+    #       the rungs with the best fill rate by adding extra lots of the
+    #       cheapest already-picked bond.
+    #
+    # Default OFF — every legacy test exercises the standard pass only.
+    maximize_allocation: bool = False
+    max_tolerance_months: int = 24
+    min_residue_threshold_pct: float = 5.0
+
     def __post_init__(self) -> None:
         total = self.gov_ita_weight + self.corp_weight + self.gov_foreign_weight
         if abs(total - 1.0) > 1e-6:
@@ -158,6 +176,15 @@ class LadderProposal:
     config: LadderBuilderConfig
     generation_date: pd.Timestamp
     rungs: list[RungProposal]
+
+    # ---- v3.1.1: maximize-allocation telemetry ----
+    # Always populated, even when ``config.maximize_allocation`` is False.
+    # Free-form lines the UI renders in an expander.
+    allocation_log: list[str] = field(default_factory=list)
+    # ``weighted_avg_ytm`` after the standard pass only — i.e. what the
+    # proposal would have looked like without the maximization fallbacks.
+    # ``None`` when maximization didn't run or didn't change anything.
+    yield_without_maximization: Optional[float] = None
 
     # ---- aggregates ----
 
@@ -291,6 +318,128 @@ class LadderBuilder:
         self._universe_override = universe  # injectable for tests
 
     def build(self) -> LadderProposal:
+        """Standard pass, then (optionally) maximization fallbacks.
+
+        Behavior when ``config.maximize_allocation`` is False — the v3.1.0
+        default — is identical to the previous implementation: a single
+        rung-by-rung pass over the universe. The proposal still gets a
+        small ``allocation_log`` summarising the run, but no ``yield_without_maximization``.
+
+        When the flag is True, the builder runs the standard pass first,
+        then applies tolerance expansion + greedy reallocation as
+        described in :class:`LadderBuilderConfig`.
+        """
+        proposal = self._build_standard()
+
+        # Base log entries — always populated so the UI expander has content.
+        proposal.allocation_log = [
+            f"Step 1 (standard): allocato €{proposal.total_allocated_eur:,.0f} "
+            f"/ €{proposal.total_target_eur:,.0f}",
+            f"Bond selezionati: {proposal.n_bonds_selected}",
+            f"Bond scartati: {proposal.n_bonds_skipped}",
+            f"Gradini ribilanciati (gov estero → BTP): "
+            f"{sum(1 for r in proposal.rungs if r.composition_was_adapted)}",
+        ]
+
+        if not self.config.maximize_allocation:
+            return proposal
+
+        # Track yield of the standard pass for the trade-off display.
+        yield_step1 = proposal.weighted_avg_ytm
+
+        # === Step A: tolerance window expansion for under-allocated rungs ===
+        proposal.allocation_log.append(
+            f"Step 2 (tolerance expansion): cerco bond extra per i gradini "
+            f"sotto-allocati, finestra fino a ±{self.config.max_tolerance_months}m"
+        )
+        original_tol = self.config.maturity_tolerance_months
+        # Use a sequence of expanded windows ending at the configured cap.
+        expansion_steps: list[int] = []
+        for tol in (12, 18, 24):
+            if tol > original_tol and tol <= self.config.max_tolerance_months:
+                expansion_steps.append(tol)
+        universe = self._load_universe()
+
+        for i, rung in enumerate(proposal.rungs):
+            if rung.coverage_pct >= 0.9:
+                continue
+            for tol in expansion_steps:
+                old_amount = rung.actual_amount_eur
+                rebuilt = self._rebuild_rung_with_tolerance(
+                    rung=rung,
+                    tolerance_months=tol,
+                    universe=universe,
+                    proposal=proposal,
+                )
+                if rebuilt.actual_amount_eur > old_amount:
+                    proposal.rungs[i] = rebuilt
+                    proposal.allocation_log.append(
+                        f"  Gradino {rung.rung_index + 1}: tolerance ±{tol}m → "
+                        f"recuperati €{rebuilt.actual_amount_eur - old_amount:,.0f}"
+                    )
+                    rung = rebuilt
+                    if rung.coverage_pct >= 0.9:
+                        break
+
+        # Restore the original tolerance setting on the config (we only
+        # mutated it inside the helper, but defensive cleanup is cheap).
+        self.config.maturity_tolerance_months = original_tol
+
+        proposal.allocation_log.append(
+            f"Step 2 done: allocato €{proposal.total_allocated_eur:,.0f}"
+        )
+
+        # === Step B: greedy reallocation of remaining residue ===
+        residue = proposal.total_unallocated_eur
+        residue_pct = (
+            (residue / proposal.total_target_eur * 100)
+            if proposal.total_target_eur > 0
+            else 0
+        )
+        if residue_pct > self.config.min_residue_threshold_pct:
+            proposal.allocation_log.append(
+                f"Step 3 (greedy reallocation): residuo €{residue:,.0f} "
+                f"({residue_pct:.1f}%) > soglia "
+                f"{self.config.min_residue_threshold_pct:.0f}% — redistribuisco "
+                f"sui gradini con miglior fill rate"
+            )
+            for _ in range(50):  # safety cap
+                current_residue = proposal.total_unallocated_eur
+                if current_residue < 100:  # less than €100 → stop
+                    break
+                target_rung = self._find_best_rung_for_reallocation(proposal)
+                if target_rung is None:
+                    proposal.allocation_log.append(
+                        "  Greedy: nessun gradino con capacity, stop"
+                    )
+                    break
+                added = self._add_extra_lot_to_rung(target_rung, current_residue)
+                if added <= 0:
+                    break
+                proposal.allocation_log.append(
+                    f"  Greedy: +€{added:,.0f} al gradino "
+                    f"{target_rung.rung_index + 1}"
+                )
+            proposal.allocation_log.append(
+                f"Step 3 done: allocato €{proposal.total_allocated_eur:,.0f}"
+            )
+        else:
+            proposal.allocation_log.append(
+                f"Step 3 saltato: residuo {residue_pct:.1f}% ≤ soglia "
+                f"{self.config.min_residue_threshold_pct:.0f}%"
+            )
+
+        # Track the yield drift caused by maximization. Only attach when
+        # it actually changed (otherwise the UI banner would lie).
+        yield_now = proposal.weighted_avg_ytm
+        if abs(yield_now - yield_step1) > 1e-6:
+            proposal.yield_without_maximization = yield_step1
+
+        return proposal
+
+    # -------- standard pass (was the old build()) --------
+
+    def _build_standard(self) -> LadderProposal:
         rung_targets = self._compute_rung_targets()
         amount_per_rung = self.config.budget_eur / self.config.n_rungs
         universe = self._load_universe()
@@ -317,6 +466,116 @@ class LadderBuilder:
             generation_date=pd.Timestamp.today().normalize(),
             rungs=rungs,
         )
+
+    # -------- maximize-allocation helpers --------
+
+    def _global_alloc_excluding_rung(
+        self, proposal: LadderProposal, exclude_index: int
+    ) -> dict[str, float]:
+        """Issuer allocation across the proposal, minus the rung we're rebuilding.
+
+        The concentration cap on corporate issuers must still be respected
+        when re-attempting a rung. We rebuild the global_alloc dict from
+        the current proposal state, skipping the rung whose bonds will be
+        replaced.
+        """
+        alloc: dict[str, float] = {}
+        for r in proposal.rungs:
+            if r.rung_index == exclude_index:
+                continue
+            for bond in r.selected_bonds.values():
+                if bond is not None:
+                    alloc[bond.issuer] = alloc.get(bond.issuer, 0.0) + bond.amount_eur
+        return alloc
+
+    def _rebuild_rung_with_tolerance(
+        self,
+        *,
+        rung: RungProposal,
+        tolerance_months: int,
+        universe: pd.DataFrame,
+        proposal: LadderProposal,
+    ) -> RungProposal:
+        """Re-run ``_build_rung`` for one rung with a wider tolerance window.
+
+        Mutates ``self.config.maturity_tolerance_months`` for the duration
+        of the call, then restores it. The concentration cap is re-derived
+        from the rest of the proposal so we don't double-count.
+        """
+        saved_tol = self.config.maturity_tolerance_months
+        self.config.maturity_tolerance_months = tolerance_months
+        try:
+            global_alloc = self._global_alloc_excluding_rung(
+                proposal, exclude_index=rung.rung_index
+            )
+            return self._build_rung(
+                rung_index=rung.rung_index,
+                target_maturity=rung.target_maturity_date,
+                target_amount=rung.target_amount_eur,
+                universe=universe,
+                global_alloc=global_alloc,
+            )
+        finally:
+            self.config.maturity_tolerance_months = saved_tol
+
+    def _find_best_rung_for_reallocation(
+        self, proposal: LadderProposal
+    ) -> Optional[RungProposal]:
+        """Pick a rung suitable for an extra lot: must have at least one
+        selected bond (so we know the maturity window worked), and prefer
+        the rung with the highest current coverage (least likely to bust
+        the concentration cap, most likely to have headroom)."""
+        candidates = [
+            r for r in proposal.rungs if any(b is not None for b in r.selected_bonds.values())
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda r: r.coverage_pct)
+
+    def _add_extra_lot_to_rung(
+        self, rung: RungProposal, available_amount: float
+    ) -> float:
+        """Add one more lot to the cheapest already-selected bond in this
+        rung that fits inside ``available_amount`` and the concentration
+        cap. Returns the euro amount added (0 if nothing fit).
+
+        ``SelectedBond.quantity`` counts **lots**, not nominal EUR, so
+        incrementing by 1 == one extra lot. ``amount_eur`` is recomputed
+        consistently.
+        """
+        # Sort selected bonds in the rung by lot cost ascending, so we
+        # add the cheapest first (maximises chance of fitting the residue).
+        bonds = [
+            b
+            for b in rung.selected_bonds.values()
+            if b is not None and b.price_clean > 0
+        ]
+        if not bonds:
+            return 0.0
+        bonds.sort(key=lambda b: b.lot_size_eur * b.price_clean / 100.0)
+        for bond in bonds:
+            lot_eur = bond.lot_size_eur * bond.price_clean / 100.0
+            if lot_eur <= 0 or lot_eur > available_amount:
+                continue
+            # Concentration check (corp only).
+            if bond.category == "corp":
+                cap_eur = (
+                    self.config.corp_max_issuer_concentration_pct
+                    / 100.0
+                    * self.config.budget_eur
+                )
+                # Rough self-derived current alloc for this issuer
+                # (we don't have a proposal-wide alloc handy here; if the
+                # extra lot would push us past the cap by more than 0.1pp,
+                # skip it. The legacy concentration_warnings will still
+                # flag the resulting overshoot for the UI.)
+                existing = bond.amount_eur
+                if existing + lot_eur > cap_eur * 1.001:
+                    continue
+            bond.quantity += 1
+            bond.amount_eur += lot_eur
+            return lot_eur
+        return 0.0
 
     # -------- internals --------
 

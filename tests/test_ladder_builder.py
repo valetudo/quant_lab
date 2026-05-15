@@ -258,3 +258,57 @@ def test_format_broker_list_is_plain_text():
     text = format_broker_list(proposal)
     assert "LADDER ACQUISITION" in text
     assert "Gradino 1" in text
+
+
+# ---------- v3.1.1: maximize_allocation toggle ----------
+
+
+def test_allocation_log_always_populated_even_without_maximize():
+    today = pd.Timestamp.today().normalize()
+    universe = _synthetic_universe(today)
+    cfg = LadderBuilderConfig(
+        budget_eur=30_000, n_rungs=3, max_duration_years=3
+    )
+    proposal = LadderBuilder(cfg, universe=universe).build()
+    # Step 1 line is always there + a few summary stats.
+    assert proposal.allocation_log
+    assert any("Step 1" in entry for entry in proposal.allocation_log)
+    # yield_without_maximization stays None when maximize is OFF.
+    assert proposal.yield_without_maximization is None
+
+
+def test_maximize_allocation_runs_extra_steps():
+    today = pd.Timestamp.today().normalize()
+    universe = _synthetic_universe(today)
+    cfg = LadderBuilderConfig(
+        budget_eur=30_000,
+        n_rungs=3,
+        max_duration_years=3,
+        maximize_allocation=True,
+    )
+    proposal = LadderBuilder(cfg, universe=universe).build()
+    # With maximize ON, Step 2 + Step 3 messages must appear.
+    log_text = "\n".join(proposal.allocation_log)
+    assert "Step 2" in log_text
+    assert "Step 3" in log_text
+
+
+def test_maximize_allocation_off_does_not_lose_existing_behaviour():
+    """Regression: every legacy assertion that holds with maximize=False
+    keeps holding. We re-check composition, n_bonds_selected, and the
+    composition adaptation path."""
+    today = pd.Timestamp.today().normalize()
+    universe = _synthetic_universe_only_low_rated_foreign(today)
+    cfg = LadderBuilderConfig(
+        budget_eur=30_000,
+        n_rungs=3,
+        max_duration_years=3,
+        foreign_min_rating="A-",
+        maximize_allocation=False,
+    )
+    proposal = LadderBuilder(cfg, universe=universe).build()
+    # Adaptation path still fires (foreign rating too low → 75/25).
+    assert all(r.composition_was_adapted for r in proposal.rungs)
+    assert all(
+        r.composition["gov_ita"] == pytest.approx(0.75) for r in proposal.rungs
+    )

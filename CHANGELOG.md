@@ -3,6 +3,61 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] — 2026-05-15
+
+Ladder Builder refinements based on three user-feedback items.
+
+### Added
+
+- **`maximize_allocation` toggle** (default OFF) in
+  `LadderBuilderConfig`. When ON, after the standard pass the builder
+  runs two fallback strategies to push allocation toward 100 %:
+  - Step A — **tolerance window expansion** (re-runs under-allocated
+    rungs with ±12 / ±18 / ±24 months; cap configurable via
+    `max_tolerance_months`).
+  - Step B — **greedy reallocation** of the residual budget into the
+    rungs with the best fill rate (cap configurable via
+    `min_residue_threshold_pct`, default 5 %).
+- **`LadderProposal.allocation_log: list[str]`** — always populated,
+  even with maximize OFF. Surfaced in a new "📋 Log dettagliato del
+  processo di allocazione" expander on the Ladder Builder page.
+- **`LadderProposal.yield_without_maximization: Optional[float]`** —
+  the standard-pass yield, set only when maximize ON changed the final
+  yield. The UI shows the Δ pp explicitly so the user sees the trade-off.
+- **Borsa Italiana link column**: a compact table under the cashflow
+  timeline with `st.column_config.LinkColumn` opens the BI catalog page
+  for each ISIN in a new tab (search endpoint, market-agnostic).
+- **3 new tests** in `tests/test_ladder_builder.py` locking in the
+  maximize toggle behaviour.
+
+### Changed
+
+- **Concentration-limit warning rewritten**: was a generic
+  "Concentrazioni emittenti oltre il limite: X: 5.3% > limite 5%".
+  Now a bordered container with the rationale (rischio credito), a
+  ℹ️ tooltip with extended explanation, severity classification
+  (minimo < 2 pp vs significativo ≥ 2 pp), and action suggestions
+  tuned to the severity.
+
+### Backward compatibility
+
+- `LadderBuilderConfig` and `LadderProposal` extended with default-valued
+  fields only — every existing constructor call keeps working.
+- Default `maximize_allocation=False` reproduces v3.1.0 behaviour
+  byte-per-byte.
+- Test suite: 97 → **100** (3 new, 0 broken).
+
+### Reference run (€50k / 10 rungs / 10 y, real bonds.db)
+
+| | maximize=False | maximize=True |
+|---|---:|---:|
+| Coverage | 78.2 % | **98.9 %** |
+| Wavg YTM | 3.04 % | 3.25 % |
+| Allocated | €39,117 | **€49,473** |
+
+See `_migration_log/V3_1_1_LADDER_BUILDER_REFINEMENTS.md` for the full
+rationale.
+
 ## [3.1.0] — 2026-05-15
 
 ### Changed
