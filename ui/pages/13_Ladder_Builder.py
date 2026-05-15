@@ -33,6 +33,23 @@ from strategies.bonds_income.ladder_builder import (
 from ui.components.mode_badge import mode_badge
 from ui.utils.ladder_viz import build_cashflow_timeline, build_ladder_chart
 
+# ----- pending widget updates (must run BEFORE any widget is rendered) -----
+#
+# Streamlit forbids writing to ``st.session_state[KEY]`` once a widget with
+# ``key=KEY`` has been instantiated in the current run — it raises
+# ``StreamlitAPIException``. The "Usa questi" button on the optimal-params
+# panel (added in v3.1.2) wanted to push new values into the form widgets,
+# so it crashed.
+#
+# Pattern: the button stages its updates into the special
+# ``_pending_lb_apply`` dict and reruns; we apply them HERE, at the top of
+# the script, before any widget exists, then pop the staging key so the
+# update fires exactly once.
+_pending = st.session_state.pop("_pending_lb_apply", None)
+if _pending:
+    for _k, _v in _pending.items():
+        st.session_state[_k] = _v
+
 st.set_page_config(page_title="Ladder Builder", page_icon="🏗️", layout="wide")
 st.title("🏗️ Ladder Builder")
 mode_badge(
@@ -255,10 +272,17 @@ if _optimal_results:
                     key=f"lb_apply_opt_{idx}",
                     type=("primary" if idx == 0 else "secondary"),
                 ):
-                    # Pre-populate the number_input widgets via session_state.
-                    st.session_state["lb_n_rungs"] = cand.n_rungs
-                    st.session_state["lb_max_dur"] = cand.max_duration_years
-                    # Clear results so the panel collapses after apply.
+                    # Stage the widget-keyed updates instead of writing
+                    # straight to session_state — direct writes would fail
+                    # because the number_input widgets have already been
+                    # instantiated higher up in this script run.
+                    # The staging dict is consumed at the top of the next
+                    # run, before any widget renders.
+                    st.session_state["_pending_lb_apply"] = {
+                        "lb_n_rungs": cand.n_rungs,
+                        "lb_max_dur": cand.max_duration_years,
+                    }
+                    # Collapse the results panel after apply.
                     st.session_state.pop("lb_optimal_results", None)
                     st.rerun()
 

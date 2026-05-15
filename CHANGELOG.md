@@ -3,6 +3,40 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.3] — 2026-05-15
+
+Hotfix for the optimal-params "Usa questi" button shipped in 3.1.2.
+
+### Fixed
+
+- **`StreamlitAPIException` on "Usa questi"** in the Ladder Builder
+  optimal-params panel: clicking any of the suggested combinations
+  tried to write `st.session_state["lb_n_rungs"]` and
+  `st.session_state["lb_max_dur"]` *after* the number-input widgets
+  with those keys had already been rendered earlier in the same
+  script run — Streamlit forbids that and raised
+  `st.session_state.lb_n_rungs cannot be modified after the widget
+  with key lb_n_rungs is instantiated.`
+- Fix: standard **staging pattern**. The button now writes
+  `st.session_state["_pending_lb_apply"] = {"lb_n_rungs": …, "lb_max_dur": …}`
+  and calls `st.rerun()`. At the very top of `13_Ladder_Builder.py`
+  (before any widget is created) we pop `_pending_lb_apply` and apply
+  its entries into `session_state` — at that point the widgets don't
+  exist yet, so the writes are legal. The next render reads the new
+  values from `session_state`, exactly like the user intended.
+
+### Tested
+
+- AppTest simulation: click "Trova parametri ottimali" → click "Usa
+  questi" on the top recommendation → page re-renders without
+  exception, number-input widgets reflect the recommended values
+  (e.g. 5 rungs, 15 y).
+- 102/102 pytest verdi (no regressions).
+
+### Backward compatibility
+
+100 %: only the apply path changed, everything else is identical to 3.1.2.
+
 ## [3.1.2] — 2026-05-15
 
 Auto-suggestion of optimal `(n_rungs, max_duration)` for a given budget.
