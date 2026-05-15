@@ -264,7 +264,19 @@ if exclude_inflation and "inflation_linked" in df.columns:
     mask &= ~df["inflation_linked"].fillna(False)
 
 view = df[mask].sort_values("net_yield_pa", ascending=False)
-st.metric("Bond filtrati", len(view))
+
+# "Bond filtrati" — show the count relative to the loaded universe
+# (``df``), which is the exact set the filters operate on. Italian-style
+# thousands separator.
+_n_filtered = len(view)
+_n_total = len(df)
+_pct = (_n_filtered / _n_total * 100) if _n_total > 0 else 0.0
+st.metric(
+    "Bond filtrati",
+    f"{_n_filtered:,} / {_n_total:,}".replace(",", "."),
+    delta=f"{_pct:.1f}% del totale",
+    delta_color="off",
+)
 
 # ---- table ---------------------------------------------------------------
 

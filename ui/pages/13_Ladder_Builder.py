@@ -21,14 +21,12 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 # ---
 
-from strategies.bonds_income.ladder import LadderTracker
 from strategies.bonds_income.ladder_builder import (
     LadderBuilder,
     LadderBuilderConfig,
     ParamCandidate,
     compute_next_12m_cashflow,
     find_optimal_params,
-    format_broker_list,
 )
 from ui.components.mode_badge import mode_badge
 from ui.utils.ladder_viz import build_cashflow_timeline, build_ladder_chart
@@ -766,111 +764,3 @@ with e2:
             "link cliccabili a Borsa Italiana + note operative."
         ),
     )
-
-st.markdown("---")
-st.subheader("🎯 Azioni")
-a1, a2 = st.columns(2)
-with a1:
-    if st.button(
-        "📋 Lista per broker",
-        use_container_width=True,
-        disabled=df.empty,
-        key="lb_broker_btn",
-    ):
-        st.session_state["show_broker_list"] = True
-with a2:
-    if st.button(
-        "✅ Conferma posizioni acquisite",
-        type="primary",
-        use_container_width=True,
-        disabled=df.empty,
-        key="lb_confirm_btn",
-    ):
-        st.session_state["confirming_ladder"] = True
-
-if st.session_state.get("show_broker_list"):
-    st.code(format_broker_list(proposal), language="text")
-
-# ----- confirmation workflow -----
-
-if st.session_state.get("confirming_ladder"):
-    st.markdown("---")
-    st.subheader("Conferma prezzi reali di esecuzione")
-    st.caption(
-        "Inserisci i prezzi effettivi ottenuti dal broker. Al submit, ogni "
-        "bond viene registrato nel Ladder Tracker (file parquet locale, "
-        "lettura possibile da `/portfolio-overview` hidden page)."
-    )
-
-    flat: list[tuple] = []
-    for r in proposal.rungs:
-        for category, bond in r.selected_bonds.items():
-            if bond is not None:
-                flat.append((r, category, bond))
-
-    with st.form("confirm_form"):
-        confirmations: dict[str, dict] = {}
-        for r, _category, bond in flat:
-            f1, f2, f3 = st.columns([3, 1, 1])
-            with f1:
-                st.text(
-                    f"Gradino {r.rung_index + 1} — {bond.name} ({bond.isin})"
-                )
-            with f2:
-                confirmations[bond.isin] = {
-                    "price": st.number_input(
-                        f"Prezzo effettivo — {bond.isin}",
-                        value=float(bond.price_clean),
-                        step=0.01,
-                        format="%.2f",
-                        key=f"px_{bond.isin}",
-                        label_visibility="collapsed",
-                    ),
-                    "bond": bond,
-                }
-            with f3:
-                st.text(f"Lotti: {bond.quantity}")
-
-        submitted = st.form_submit_button(
-            "💾 Salva nel Ladder Tracker", type="primary"
-        )
-        if submitted:
-            lt = LadderTracker()
-            today_dt = date.today()
-            ok_, fail_ = [], []
-            for isin, payload in confirmations.items():
-                bond = payload["bond"]
-                try:
-                    lt.add_position(
-                        isin=bond.isin,
-                        description=bond.name,
-                        quantity=int(bond.quantity * bond.lot_size_eur),
-                        avg_purchase_price=float(payload["price"]),
-                        purchase_date=today_dt,
-                        coupon=float(bond.coupon_rate * 100),
-                        maturity_date=bond.maturity_date.date(),
-                        ytm_at_purchase=float(bond.ytm_net * 100),
-                        nation=bond.country,
-                        issuer_type=(
-                            "Government" if bond.category != "corp" else "Corporate"
-                        ),
-                        rating=bond.rating,
-                        notes=(
-                            f"Generato da Ladder Builder — gradino target "
-                            f"{bond.maturity_date.strftime('%Y-%m')}"
-                        ),
-                        current_price=float(payload["price"]),
-                    )
-                    ok_.append(bond.isin)
-                except Exception as e:
-                    fail_.append((bond.isin, str(e)))
-            if ok_:
-                st.success(
-                    f"✅ Registrate **{len(ok_)} posizioni** nel Ladder Tracker."
-                )
-            if fail_:
-                st.error(
-                    "Alcune posizioni non sono state registrate:\n"
-                    + "\n".join(f"- `{isin}`: {err}" for isin, err in fail_)
-                )
-            st.session_state.pop("confirming_ladder", None)

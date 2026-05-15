@@ -3,6 +3,35 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] — 2026-05-15
+
+Two minor UX fixes from real-world use.
+
+### Removed
+
+- **"🎯 Azioni" section in the Ladder Builder** — the residual v2.x
+  buttons "📋 Lista per broker" and "✅ Conferma posizioni acquisite".
+  Dead code in v3.x: the broker list duplicates the CSV/PDF export, and
+  the confirmation form wrote into the hidden `LadderTracker` (portfolio
+  management waits for broker-API integration). The page now ends with
+  the "📤 Esporta proposta" section. Unused imports (`LadderTracker`,
+  `format_broker_list`) cleaned up.
+
+### Changed
+
+- **"Bond filtrati" metric** on the Bonds page now shows
+  `filtrati / totale` (e.g. `494 / 1.847`) with a `% del totale`
+  sub-label, instead of just the filtered count. The denominator is
+  `len(df)` — the loaded catalog the filters operate on.
+
+### Backward compatibility
+
+100 %: no API changed; `LadderTracker` / `format_broker_list` still
+exported, just no longer called by the Ladder Builder page. 106/106
+tests still green.
+
+See `_migration_log/V3_2_1_UX_FIXES.md`.
+
 ## [3.2.0] — 2026-05-15
 
 ### Added
