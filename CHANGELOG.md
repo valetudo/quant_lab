@@ -3,6 +3,44 @@
 All notable changes to **Quant Lab**. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.4] — 2026-05-15
+
+Hotfix: "Usa questi" now renders the ladder immediately.
+
+### Fixed
+
+- **"Usa questi" updated the form but didn't show the ladder.** After
+  clicking a recommendation in the optimal-params panel the widgets
+  were repopulated correctly, but the page still showed *"Imposta i
+  parametri qui sopra e clicca Genera proposta ladder"* — the user had
+  to click "Genera proposta" manually.
+- Root cause: `find_optimal_params` discarded the `LadderProposal` it
+  built for each grid combination, keeping only the scalar metrics.
+  "Usa questi" had no proposal to promote.
+- Fix:
+  - `ParamCandidate` gains a `proposal: Optional[LadderProposal]` field;
+    `find_optimal_params` now keeps the proposal it built (plus a minimal
+    `allocation_log` so the detail expander isn't empty).
+  - "Usa questi" promotes `cand.proposal` straight into
+    `st.session_state["ladder_proposal"]` — the visualisation reads from
+    there and renders instantly. Zero extra compute (the finder already
+    built it during the search).
+  - The recommendation panel is **no longer collapsed** after applying,
+    so clicking a different recommendation flips the displayed ladder
+    instantly.
+
+### Tested
+
+- AppTest: "Trova parametri ottimali" → "Usa questi" → ladder renders,
+  0 exceptions, no "Imposta i parametri" message. Clicking another
+  recommendation switches the proposal (verified 5-rung → 3-rung
+  swap). 102/102 pytest verdi.
+
+### Backward compatibility
+
+100 %: `ParamCandidate.proposal` defaults to `None`; the two existing
+`find_optimal_params` tests are unaffected.
+
 ## [3.1.3] — 2026-05-15
 
 Hotfix for the optimal-params "Usa questi" button shipped in 3.1.2.

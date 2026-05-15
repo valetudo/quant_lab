@@ -282,8 +282,17 @@ if _optimal_results:
                         "lb_n_rungs": cand.n_rungs,
                         "lb_max_dur": cand.max_duration_years,
                     }
-                    # Collapse the results panel after apply.
-                    st.session_state.pop("lb_optimal_results", None)
+                    # Promote the pre-computed proposal to the live
+                    # proposal so the ladder renders immediately — no need
+                    # for the user to click "Genera proposta" again.
+                    # The finder already built it (standard pass), so this
+                    # is zero extra compute.
+                    if cand.proposal is not None:
+                        st.session_state["ladder_proposal"] = cand.proposal
+                        st.session_state.pop("confirming_ladder", None)
+                        st.session_state.pop("show_broker_list", None)
+                    # Keep the recommendation panel visible so the user can
+                    # click another "Usa questi" and flip instantly.
                     st.rerun()
 
 

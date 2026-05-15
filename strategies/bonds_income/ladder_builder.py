@@ -956,6 +956,14 @@ class ParamCandidate:
 
     The finder ranks candidates by ``coverage_pct`` (primary), then by
     ``weighted_avg_ytm`` (tiebreaker). The UI displays the top N.
+
+    ``proposal`` carries the actual :class:`LadderProposal` the finder
+    built when evaluating this combination. Stored as-is so the UI's
+    "Usa questi" button can promote it to the live proposal without
+    re-running the build (added in v3.1.4 — the visualisation flips
+    instantly when the user clicks a different recommendation).
+    Field is ``None`` only if a third-party caller constructs
+    ``ParamCandidate`` manually for testing.
     """
 
     n_rungs: int
@@ -964,6 +972,7 @@ class ParamCandidate:
     weighted_avg_ytm: float  # decimal
     allocated_eur: float
     n_bonds_selected: int
+    proposal: Optional["LadderProposal"] = None
 
 
 # Reasonable defaults that cover the typical retail use cases (€10k–€500k,
@@ -1027,6 +1036,19 @@ def find_optimal_params(
                 if proposal.total_target_eur > 0
                 else 0.0
             )
+            # Mirror the minimal allocation_log that build() would have
+            # populated. Keeps the UI's "📋 Log dettagliato" expander
+            # non-empty when the user promotes this proposal via "Usa questi".
+            proposal.allocation_log = [
+                f"Step 1 (standard): allocato €{proposal.total_allocated_eur:,.0f} "
+                f"/ €{proposal.total_target_eur:,.0f}",
+                f"Bond selezionati: {proposal.n_bonds_selected}",
+                f"Bond scartati: {proposal.n_bonds_skipped}",
+                f"Gradini ribilanciati (gov estero → BTP): "
+                f"{sum(1 for r in proposal.rungs if r.composition_was_adapted)}",
+                f"(generato da Trova parametri ottimali — n_rungs={n_rungs}, "
+                f"max_duration={max_dur}y)",
+            ]
             candidates.append(
                 ParamCandidate(
                     n_rungs=n_rungs,
@@ -1035,6 +1057,10 @@ def find_optimal_params(
                     weighted_avg_ytm=proposal.weighted_avg_ytm,
                     allocated_eur=proposal.total_allocated_eur,
                     n_bonds_selected=proposal.n_bonds_selected,
+                    # Hold on to the actual proposal — the UI uses it to
+                    # render the ladder immediately when the user clicks
+                    # "Usa questi", without a second build pass.
+                    proposal=proposal,
                 )
             )
 
